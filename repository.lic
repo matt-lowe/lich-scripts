@@ -1,0 +1,273 @@
+=begin
+
+	This script allows you to connect to the Lich server to upload and download scripts.
+
+	tillmen@lichproject.org
+
+=end
+
+unless $SAFE == 0
+	echo "this script must be trusted to work (;trust #{script.name})"
+	exit
+end
+
+force_it = script.vars.delete('--force')
+
+if XMLData.game =~ /^DR/
+	port = 7156
+else
+	port = 7153
+end
+
+get_lich_server = proc {
+	begin
+		# lich_server = TCPSocket.open('204.232.207.222', port)
+		lich_server = TCPSocket.open('216.224.171.85', port)
+	rescue
+		lich_server.close rescue()
+		lich_server = nil
+		echo "error connecting to server: #{$!}"
+	end
+	lich_server
+}
+
+if script.vars[1] =~ /^download$/i
+	echo 'connecting to the server...'
+	lich_server = get_lich_server.call
+	lich_server.sync = true
+	lich_server.write('d')
+	lich_server.puts(script.vars[2].sub(/\.[A-z]{1,3}$/, ''))
+	rsp = lich_server.gets.chomp
+	if rsp == 'good'
+		fname = lich_server.gets.chomp
+		echo "downloading #{fname} in 3 seconds... (;k #{script.name} to abort)"
+		sleep 3
+		echo 'starting download...'
+		sleep 0.25
+		if fname =~ /\.dat$/
+			lich_server.binmode
+			data = lich_server.read
+			lich_server.close rescue()
+			File.open("#{$script_dir}#{fname}", 'wb') { |f| f.write(data) }
+			GC.start
+		else
+			data = lich_server.readlines
+			lich_server.close rescue()
+			if force_it.nil? and File.exists?("#{$script_dir}#{fname}") and (data.join.slice(/=begin.*?=end/m).to_s =~ /Required\:.*?Lich\s*v?([0-9]+\.[0-9]+\.[0-9]+)/i)
+				required_version = $1
+				formatted_required_version = $1.split('.').collect { |num| num.rjust(5, '0') }.join('.')
+				if formatted_required_version > $version.split('.').collect { |num| num.rjust(5, '0') }.join('.')
+					echo "#{fname} requires Lich v#{required_version} and you are running Lich v#{$version}."
+					echo "Kill this script (;k #{script.name}) to cancel or unpause it (;u #{script.name}) to continue."
+					pause_script
+				end
+			end
+			File.open("#{$script_dir}#{fname}", 'w') { |file| file.puts(data.collect { |line| line.chomp }) }
+		end
+		echo 'done'
+	elsif rsp == 'none'
+		echo 'error: could not find that script on the server'
+	elsif rsp.nil?
+		echo 'error: server did not understand request'
+	else
+		echo 'error: unrecognized response from the server'
+	end
+elsif script.vars[1] =~ /^upload$/i
+	key_dir = "#{$lich_dir}keys/"
+	Dir.mkdir(key_dir) unless File.exists?(key_dir)
+	name = script.vars[2]
+	list = Dir.entries($script_dir)
+	if File.exists?("#{$script_dir}#{name}.lic")
+		fname = "#{name}.lic"
+	else
+		fname = (list.find { |file| file =~ /^#{name}$/ } || list.find { |file| file =~ /^#{name}\.(?:lic|cmd|wiz|txt|dat)$/i }) || list.find { |file| file =~ /^#{name}[^.]+\.(?:lic|cmd|wiz|txt|dat)$/i }
+	end
+	unless fname.nil?
+		echo 'connecting to the server...'
+		lich_server = get_lich_server.call
+		lich_server.write('u')
+		lich_server.puts(fname)
+		rsp = lich_server.gets.chomp
+		if rsp == 'good'
+			echo "uploading #{fname} in 3 seconds... (;k #{script.name} to abort)"
+			sleep 3
+			echo 'starting upload...'
+			sleep 0.25
+			data = File.open("#{$script_dir}#{fname}") { |f| f.read }
+			lich_server.send("#{data.length}\n",0)
+			key = lich_server.gets.chomp
+			key_name = fname.sub(/\.[A-z]+$/i,'.key')
+			if File.exists?("#{key_dir}#{key_name}")
+				File.open("#{key_dir}#{key_name}", 'rb') { |infile|
+					File.open("#{$temp_dir}#{key_name}", 'wb') { |outfile|
+						outfile.write(infile.read)
+					}
+				}
+			end
+			File.open("#{key_dir}#{key_name}", 'wb') { |file| file.write(key) }
+			lich_server.write(data)
+			lich_server.close
+			echo 'done'
+		elsif rsp == 'exists'
+			echo "updating #{fname} in 3 seconds... (;k #{script.name} to abort)"
+			sleep 3
+			key_name = fname.sub(/\.[A-z]+$/i,'.key')
+			if File.exists?("#{key_dir}#{key_name}")
+				key = File.open("#{key_dir}#{key_name}") { |file| file.read }
+				lich_server.puts(key)
+				keyresp = lich_server.gets.chomp
+				if keyresp == 'GOOD'
+					lich_server.close
+					sleep 1
+					lich_server = get_lich_server.call
+					lich_server.write('u')
+					lich_server.puts(fname)
+					rsp = lich_server.gets.chomp
+					if rsp == 'good'
+						sleep 0.25
+						data = File.open("#{$script_dir}#{fname}") { |f| f.read }
+						lich_server.send("#{data.length}\n",0)
+						key = lich_server.gets.chomp
+						key_name = fname.sub(/\.[A-z]+$/i,'.key')
+						if File.exists?("#{key_dir}#{key_name}")
+							File.open("#{key_dir}#{key_name}", 'rb') { |infile|
+								File.open("#{$temp_dir}#{key_name}", 'wb') { |outfile|
+									outfile.write(infile.read)
+								}
+							}
+						end
+						File.open("#{key_dir}#{key_name}", 'wb') { |file| file.write(key) }
+						lich_server.write(data)
+						lich_server.close
+						echo 'done'
+					elsif rsp == 'exists'
+						echo 'error: failed to remove the existing script from the server'
+					else
+						echo 'error: unrecognized response from the server'
+					end
+				elsif keyresp == 'NOKEY'
+					echo 'error: server reported there is no key for that file'
+				else
+					echo 'error: invalid key'
+				end
+			else
+				echo 'error: script exists on the server, and the key to update it was not found'
+				lich_server.close unless lich_server.closed?
+			end
+		else
+			echo 'error: unrecognized response from the server'
+		end
+	else
+		echo "error: #{name} does not exist"
+	end
+elsif script.vars[1] =~ /^delete$/i
+	key_dir = "#{$lich_dir}keys/"
+	Dir.mkdir(key_dir) unless File.exists?(key_dir)
+	name = script.vars[2]
+	list = Dir.entries($script_dir)
+	if File.exists?("#{$script_dir}#{name}.lic")
+		fname = "#{name}.lic"
+	else
+		fname = (list.find { |file| file =~ /^#{name}$/ } || list.find { |file| file =~ /^#{name}\.(?:lic|cmd|wiz|txt|dat)$/i }) || list.find { |file| file =~ /^#{name}[^.]+\.(?:lic|cmd|wiz|txt|dat)$/i }
+	end
+	unless fname.nil?
+		echo 'connecting to the server...'
+		lich_server = get_lich_server.call
+		lich_server.write('u')
+		lich_server.puts(fname)
+		rsp = lich_server.gets.chomp
+		if rsp == 'good'
+			echo 'file does not exist on the server'
+			lich_server.close rescue()
+		elsif rsp == 'exists'
+			echo "deleteing #{fname} in 3 seconds... (;k #{script.name} to abort)"
+			sleep 3
+			key_name = fname.sub(/\.[A-z]+$/i,'.key')
+			if File.exists?("#{key_dir}#{key_name}")
+				key = File.open("#{key_dir}#{key_name}") { |file| file.read }
+				lich_server.puts(key)
+				keyresp = lich_server.gets.chomp
+				if keyresp == 'GOOD'
+					lich_server.close
+					echo 'done'
+				elsif keyresp == 'NOKEY'
+					echo 'error: server reported there is no key for that file'
+				else
+					echo 'error: invalid key'
+				end
+				lich_server.close rescue()
+			else
+				lich_server.close rescue()
+				echo 'error: key was not found'
+			end
+		else
+			lich_server.close rescue()
+			echo 'error: unrecognized response from the server'
+		end
+	else
+		lich_server.close rescue()
+		echo "error: #{name} does not exist"
+	end
+elsif script.vars[1] =~ /^list$|^sync$/i
+	echo 'connecting to the server...'
+	lich_server = get_lich_server.call
+	lich_server.sync = true
+	lich_server.write('L')
+	list = Array.new
+	while inp = lich_server.gets
+		list.push(inp.chomp)
+	end
+	lich_server.close rescue()
+	list.sort! { |x,y| x.downcase <=> y.downcase } if script.vars[2] =~ /alpha/i
+	fary = []
+	list.collect! { |data| data.chomp.split(';;') }
+	max_name_size = 0
+	list.each { |name,size,time| max_name_size = [name.length, max_name_size].max }
+	list.each { |name,size,time|
+		if File.exists?("#{$script_dir}#{name}")
+			if time.to_i > (File.mtime("#{$script_dir}#{name}").to_i + 10)
+				fary.push(" #{monsterbold_start}-#{monsterbold_end} #{name.ljust(max_name_size)} #{((size.to_i/1024.0).ceil).to_s.rjust(6)}K #{Time.at(time.to_i).strftime("%m-%d-%Y").gsub(/^0+/,'').gsub(/\-0+/,'-').rjust(10)} #{Time.at(time.to_i).strftime("%I:%M%p").downcase.gsub(/^0+/,'').rjust(7)} #{monsterbold_start}(updated)#{monsterbold_end} ")
+			elsif script.vars[1] !~ /sync/i
+				fary.push(" - #{name.ljust(max_name_size)} #{((size.to_i/1024.0).ceil).to_s.rjust(6)}K #{Time.at(time.to_i).strftime("%m-%d-%Y").gsub(/^0+/,'').gsub(/\-0+/,'-').rjust(10)} #{Time.at(time.to_i).strftime("%I:%M%p").downcase.gsub(/^0+/,'').rjust(7)}")
+			end
+		else
+			fary.push(" #{monsterbold_start}-#{monsterbold_end} #{name.ljust(max_name_size)} #{((size.to_i/1024.0).ceil).to_s.rjust(6)}K #{Time.at(time.to_i).strftime("%m-%d-%Y").gsub(/^0+/,'').gsub(/\-0+/,'-').rjust(10)} #{Time.at(time.to_i).strftime("%I:%M%p").downcase.gsub(/^0+/,'').rjust(7)}   #{monsterbold_start}(new)#{monsterbold_end} ")
+		end
+	}
+	str = fary.join("\r\n") + "\r\n"
+	if $frontend == 'stormfront'
+		str = "<output class=\"mono\"/>\r\n#{str}<output class=\"\"/>\r\n"
+	end
+	if $frontend == 'stormfront' or $frontend == 'profanity'
+		if defined?(_respond)
+			_respond str
+		else
+			puts str
+		end
+	else
+		respond str
+	end
+elsif script.vars[1] =~ /^info$/i
+	echo 'connecting to the server...'
+	lich_server = get_lich_server.call
+	lich_server.sync = true
+	lich_server.write('v')
+	lich_server.puts(script.vars[2])
+	respond(lich_server.readlines)
+	lich_server.close
+else
+	respond
+	respond 'Usage:'
+	respond
+	respond "   #{$clean_lich_char}#{script.name} list [alpha]            lists all scripts available for download (optionally in alphabetial order)"
+	respond "   #{$clean_lich_char}#{script.name} sync [alpha]            lists only new and/or updated scripts"
+	respond "   #{$clean_lich_char}#{script.name} info <script name>      shows the comments at the top of the script"
+	respond "   #{$clean_lich_char}#{script.name} download <script name>  downloads the script"
+	respond "   #{$clean_lich_char}#{script.name} upload <script name>    uploads the script"
+	respond "   #{$clean_lich_char}#{script.name} delete <script name>    deletes the script from the server"
+	respond
+	respond 'Scripts should include comments at the top describing the purpose of the script.  Scripts without comments at the top will not show up on the server.'
+	respond
+	respond "After uploading a script, a key that allows you to delete/update the script will be saved to #{$lich_dir}keys"
+	respond
+end

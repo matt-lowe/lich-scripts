@@ -1,0 +1,91 @@
+=begin
+
+	This script rummages for a scroll and invokes it
+
+	It will empty your hands if needed.
+	If a target is provided, it will cast at the target.  If not, it will leave the spell prepared.
+	Lich.scrollsack should be set (;set change scrollsack <container name>)
+
+	tillmen@lichproject.org
+
+=end
+
+unless defined?(dothis)
+	echo 'Your version of Lich is too old for this script.'
+	exit
+end
+if Lich.scrollsack.nil? or Lich.scrollsack.empty?
+	echo 'You need to set your scrollsack.  ;setting change scrollsack <container>'
+	exit
+end
+
+if (script.vars[1] =~ /help/i) or script.vars.empty?
+	respond
+	respond 'Usage: ;invoke <spell#> [target]'
+	respond
+	exit
+elsif script.vars[2]
+	spell = script.vars[1]
+	target = script.vars[2..-1].join(' ')
+else
+	spell = script.vars[1]
+	target = nil
+end
+
+return_scroll = proc {
+	if checkleft =~ /(scroll|paper|papyrus|vellum|palimpsest|parchment)/ || checkright =~ /(scroll|paper|papyrus|vellum|palimpsest|parchment)/
+		put 'put my ' + $1 + ' in my ' + Lich.scrollsack
+	end
+}
+
+empty_hands
+
+#
+# find the scroll
+#
+close_scrollsack = false
+loop {
+	rummage_result = dothis "rummage in my #{Lich.scrollsack} for spell #{spell}", /^What spell are you looking for\?$|^What were you wanting to rummage through\?$|^You'll have to open|^(In the .+)?You rummage/
+	if rummage_result =~ /and remove/
+		break
+	elsif rummage_result =~ /^You'll have to open/
+		dothis "open my #{Lich.scrollsack}", /^You open/
+		close_scrollsack = true
+		next
+	else
+		fill_hands
+		exit
+	end
+}
+#
+# if a spell is prepared, release it
+#
+unless checkprep == 'None'
+	dothis 'release', /^You feel the magic of your spell rush away from you\.$|^You don't have a prepared spell to release!$/
+end
+
+#
+# invoke the scroll
+#
+invoke_result = dothis "invoke #{spell}", /^That spell is not on the|and gesture to invoke/
+if invoke_result =~ /^That spell is not on the/
+	return_scroll.call
+	fill_hands
+	exit
+end
+#
+# cast the spell if a target was given
+#
+if target
+	dothistimeout "cast at #{target}", 5, /^You gesture|^(?:Cast|Sing) Roundtime/
+end
+return_scroll.call
+
+fill_hands
+
+#
+# close the scrollsack if it was opened
+#
+if close_scrollsack
+	dothis "close my #{Lich.scrollsack}", /^(In the.+)?You close/
+end

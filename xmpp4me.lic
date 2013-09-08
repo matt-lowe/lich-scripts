@@ -1,0 +1,373 @@
+=begin
+
+	Not wanting to answer questions about this script.
+
+	tillmen@lichproject.org
+
+=end
+
+if script.vars[1]
+	if (script.vars[1] == 'local-account') and script.vars[2]
+		CharSettings['local-account'] = script.vars[2]
+	elsif (script.vars[1] == 'local-password') and script.vars[2]
+		CharSettings['local-password'] = script.vars[2]
+	elsif (script.vars[1] == 'remote-account') and script.vars[2]
+		CharSettings['remote-account'] = script.vars[2]
+	else
+		echo "You're doing it wrong."
+	end
+	exit
+end
+
+unless local_account = CharSettings['local-account']
+	echo "You're doing it wrong."
+	exit
+end
+unless local_password = CharSettings['local-password']
+	echo "You're doing it wrong."
+	exit
+end
+unless remote_account = CharSettings['remote-account']
+	echo "You're doing it wrong."
+	exit
+end
+
+require 'xmpp4r'
+
+hide_me
+
+client = Jabber::Client.new(Jabber::JID::new(local_account))
+client.connect
+client.auth(local_password)
+client.send(Jabber::Presence.new.set_type(:available))
+
+client.on_exception {
+	begin
+		sleep 5
+		client.connect
+		client.auth(local_password)
+		client.send(Jabber::Presence.new.set_type(:available))
+	rescue
+		echo $!
+		respond $!.backtrace[0..1]
+	end
+}
+
+send_message = proc { |text|
+	msg = Jabber::Message::new(remote_account, text)
+	msg.type = :chat
+	client.send(msg)
+}
+
+$xmpp_echo = LimitedArray.new
+echo_time = Time.now
+echo_count = 0
+echo_channels = Array.new
+default_channel = nil
+exec_string = "
+	before_dying { kill_script(#{script.name.inspect}) if running?(#{script.name.inspect}) }
+	Thread.new { wait_while { running?(#{script.name.inspect}) }; Script.self.kill }
+	hide_me
+	script.want_script_output = true
+	loop { $xmpp_echo.push(get) }
+"
+start_exec_script(exec_string, flags={ :quiet => true })
+
+Thread.new {
+	loop {
+		begin
+			wait_while { $xmpp_echo.empty? }
+			if echo_count > 0
+				output = Array.new
+				10.times { 
+					if line = $xmpp_echo.shift
+						output.push (line)
+						echo_count -= 1
+						break unless echo_count > 0
+					else
+						break
+					end
+				}
+				output = output.join("\n")
+				send_message.call(output)
+			elsif (echo_time > Time.now)
+				output = Array.new
+				10.times { 
+					if line = $xmpp_echo.shift
+						output.push (line)
+					else
+						break
+					end
+				}
+				output = output.join("\n")
+				send_message.call(output)
+			elsif echo_channels.length > 0
+				output = Array.new
+				count = 0
+				while line = $xmpp_echo.shift
+					if line =~ /^\[(?:#{echo_channels.join('|')})\]/i
+						output.push(line)
+						count += 1
+						break if count >= 10
+					end
+				end
+				unless output.empty?
+					output = output.join("\n")
+					send_message.call(output)
+				end
+			else
+				$xmpp_echo.clear
+			end
+			sleep 0.25
+		rescue
+			puts $!
+			sleep 0.25
+		end
+	}
+}
+
+before_dying { Script.log "#{Time.now.strftime("%Y-%m-%d %I:%M%P")}: #{Char.name}: script ended" }
+Script.log "#{Time.now.strftime("%Y-%m-%d %I:%M%P")}: #{Char.name}: script started"
+
+if ARGV.include?('--reconnected') and (Time.now - $login_time) < 15
+ 	send_message.call('script started')
+end
+
+client.add_message_callback do |m|
+	if (m.type == :chat) and (m.from.to_s =~ /^#{remote_account}/)
+		if m.body =~ /^([0-9\.]+)?,,(.*)/
+			count = $1
+			cmd = $2
+			count ||= 1
+			if count == 0
+				echo_count = 0
+				echo_time = Time.now - 1
+			else
+				echo_count = [ echo_count, count.to_i ].max
+			end
+			unless cmd.empty?
+				if Alias.find(cmd)
+					Alias.run(cmd)
+				else
+					do_client(cmd)
+				end
+			end
+		elsif m.body =~ /^([0-9\.]+)?,(.*)/
+			seconds = $1
+			cmd = $2
+			seconds ||= 1
+			if seconds == 0
+				echo_count = 0
+				echo_time = Time.now - 1
+			else
+				echo_time = [ echo_time, (Time.now + seconds.to_f) ].max
+			end
+			unless cmd.empty?
+				if Alias.find(cmd)
+					Alias.run(cmd)
+				else
+					do_client(cmd)
+				end
+			end
+		elsif m.body =~ /^look/i
+			output = String.new
+			also_see = Array.new
+			GameObj.npcs.each { |npc|
+				if npc.status.nil?
+					also_see.push(npc.name)
+				else
+					also_see.push("#{npc.name} (#{npc.status})")
+				end
+			}
+			loot = GameObj.loot
+			unless loot.nil? or loot.empty?
+				also_see = (also_see + loot.collect { |obj| obj.name })
+			end
+			also_here = Array.new
+			GameObj.pcs.each { |pc|
+				if pc.status.nil?
+					also_here.push(pc.name)
+				else
+					also_here.push("#{pc.name} (#{pc.status})")
+				end
+			}
+			room = Room.current
+			output.concat "#{XMLData.room_title}#{' (' + room.id.to_s + ')' if room}\n"
+#			if also_see.empty?
+#				output.concat "#{XMLData.room_description}\n"
+#			else
+#				output.concat "#{XMLData.room_description}  You also see #{also_see.join(', ')}.\n"
+#			end
+			unless also_see.empty?
+				output.concat "You notice #{also_see.join(', ')}.\n"
+			end
+			unless also_here.empty?
+				output.concat "Also here: #{also_here.join(', ')}\n"
+			end
+			output.concat "#{XMLData.room_exits_string}\n"
+			send_message.call(output)
+		elsif m.body =~ /^stats/i
+			output = "mana: #{mana}/#{maxmana}, health: #{health}/#{maxhealth}, spirit: #{spirit}/#{maxspirit}"
+			wounds = Array.new
+			scars = Array.new
+			XMLData.injuries.each_pair { |area,info|
+				if info['wound'] > 0
+					wounds.push "#{area}: #{info['wound']}"
+				end
+				if info['scar'] > 0
+					wounds.push "#{area}: #{info['scar']}"
+				end
+			}
+			unless wounds.empty?
+				output.concat "\nwounds:\n#{wounds.join(', ')}"
+			end
+			unless scars.empty?
+				output.concat "\nscars:\n#{scars.join(', ')}"
+			end
+			send_message.call(output)
+		elsif m.body =~ /^@([A-z\:]+) (.*)/
+			target = $1
+			msg = $2
+			LNet.send_message(h={'type'=>'private','to'=>target}, msg)
+		elsif m.body =~ /^tune ([A-z]+)/i
+			channel = $1.downcase
+			echo_channels.push(channel) unless echo_channels.include?(channel)
+			default_channel = channel if default_channel.nil?
+			# echo tuned/default channels
+		elsif m.body =~ /^untune ([A-z]+)/i
+			channel = $1.downcase
+			echo_channels.delete(channel)
+			# fixme
+		elsif m.body =~ /^([A-z]+)?\.([A-z].+)/i
+			channel = $1.downcase
+			msg = $2
+			if echo_channels.empty?
+				send_message.call("not tuned")
+			elsif channel
+				if channel_name = echo_channels.find { |c| c =~ /^#{channel}/ }
+					LNet.send_message(h={'type'=>'channel','channel'=>channel_name}, msg)
+				else
+					send_message.call("channels: #{echo_channels.join(', ')}")
+				end
+			else
+				if echo_channels.length == 1
+					LNet.send_message(h={'type'=>'channel','channel'=>echo_channels.first}, msg)
+				else
+					send_message.call("channels: #{echo_channels.join(', ')}")
+				end
+			end
+		elsif m.body =~ /^channels/i
+			if echo_channels.empty?
+				send_message.call("not tuned")
+			else
+				send_message.call("channels: #{echo_channels.join(', ')}")
+			end
+		elsif m.body =~ /^goals/i
+			link = nil
+			hook_proc = proc { |server_string|
+				if server_string =~ /<LaunchURL src="(\/gs4\/play\/cm\/loader.asp[^"]*)" \/>/
+					link = $1
+					DownstreamHook.remove('kill-goals')
+					nil
+				else
+					server_string
+				end
+			}
+			DownstreamHook.add('kill-goals', hook_proc)
+			put 'goals'
+			100.times {
+				sleep 0.05
+				break if link
+			}
+			if link
+				send_message.call("https://www.play.net#{link}")
+			end
+		end
+	end
+end
+
+Thread.new {
+	begin
+		loop {
+			wait_until { dead? }
+			send_message.call('dead')
+			Script.log "#{Time.now.strftime("%Y-%m-%d %I:%M%P")}: #{Char.name}: dead"
+			wait_while { dead? }
+		}
+	rescue
+		echo $!
+		puts $!.backtrace[0..1]
+	end
+}
+
+Thread.new {
+	begin
+		loop {
+			wait_while { percentmind > 0 }
+			send_message.call('empty mind')
+			Script.log "#{Time.now.strftime("%Y-%m-%d %I:%M%P")}: #{Char.name}: empty mind"
+			wait_until { percentmind > 50 }
+		}
+	rescue
+		echo $!
+		puts $!.backtrace[0..1]
+	end
+}
+
+Thread.new {
+	begin
+		after = XMLData.injuries.values.collect { |area| area['wound'] }.join('')
+		loop {
+			loop {
+				before = after.dup
+				sleep 1
+				after = XMLData.injuries.values.collect { |area| area['wound'] }.join('')
+				break if (after > before) and (after.include?('2') or after.include?('3')) and not (XMLData.room_title == '[Krag Slopes]' and XMLData.room_description == 'The shrieking wind races across the frozen ground and slams against the rugged wall which rises sharply to the south.  To one side a sizeable stone chest lies on its side, firmly imbedded in the lava that spilled over it years ago.' and XMLData.room_exits_string == 'Obvious paths: north')
+			}
+			wounds = Array.new
+			scars = Array.new
+			XMLData.injuries.each_pair { |area,info|
+				if info['wound'] > 0
+					wounds.push "#{area}: #{info['wound']}"
+				end
+				if info['scar'] > 0
+					wounds.push "#{area}: #{info['scar']}"
+				end
+			}
+			output = String.new
+			unless wounds.empty?
+				output.concat "wounds:\n#{wounds.join(', ')}"
+				output.concat "\n" unless scars.empty?
+			end
+			unless scars.empty?
+				output.concat "scars:\n#{scars.join(', ')}"
+			end
+			send_message.call(output)
+			Script.log "#{Time.now.strftime("%Y-%m-%d %I:%M%P")}: #{Char.name}: wounded"
+		}
+	rescue
+		echo $!
+		puts $!.backtrace[0..1]
+	end
+}
+
+begin
+	script.want_downstream_xml = true
+	script.want_downstream = false
+	while (line = get)
+		if line =~ /^Announcement\: /
+			send_message.call(line.gsub(/<.*?>/, ''))
+		elsif line =~ /^(?:<stream id="thoughts">|<pushStream id="thoughts"\/>)\[Private\]\-[A-z\:]+\: ".*"/
+			unless line =~ /^(?:<stream id="thoughts">|<pushStream id="thoughts"\/>)\[Private\]\-GSF\:(?:Norlamin|Eschaton)\: ".*"/
+				send_message.call(line.gsub(/<.*?>/, ''))
+			end
+		elsif line =~ /^(?:<stream id="thoughts">|<pushStream id="thoughts"\/>)\[server\]\: "(?:no user named|be more specific)/
+			send_message.call(line.gsub(/<.*?>/, ''))
+		end
+	end
+ensure
+	unless $_CLIENTBUFFER_.any? { |cmd| cmd =~ /^(?:\[.*?\])?(?:<c>)?(?:quit|exit)/i }
+		send_message.call('script ended') rescue()
+	end
+	client.close
+end

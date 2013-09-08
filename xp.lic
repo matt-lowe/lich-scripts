@@ -1,0 +1,190 @@
+#quiet
+=begin
+
+	This script sends "experience" to the game, and in the results adds the total and average experience and fame gained since the first and last check.
+
+	tillmen@lichproject.org
+
+=end
+
+silence_me
+
+if script.vars[1] =~ /^clear$/i
+	$xp = {}
+	respond "Your experience tracking has been reset."
+	exit
+elsif script.vars[1] =~ /^setgoal$/i
+	xp_goal = script.vars[2].to_i
+	CharSettings['goal'] = xp_goal
+	echo 'Goal set to: ' + xp_goal.to_s
+	exit
+elsif script.vars[1] =~ /realtime/
+	CharSettings['realtime'] = :start
+	echo 'blah'
+	exit
+end
+
+xp_goal = CharSettings['goal']
+xp_now = {}
+xp_until_next = 0
+capped = false
+clear
+fput "experience"
+loop {
+	line = get
+	if line =~ /^\s+Experience: ([0-9]+)/
+		xp_now['exp'] = $1.to_i
+	elsif line =~ /^Exp\. until next: (\-?[0-9]+)/
+		xp_until_next = $1.to_i
+		capped = false
+	elsif line =~ /^Exp\. to next TP: (\-?[0-9]+)/
+		xp_until_next = $1.to_i
+		capped = true
+	elsif line =~ /^\s+Mental TPs: [0-9]+\s+Fame: ([0-9]+)/
+		xp_now['fame'] = $1.to_i
+	elsif line =~ /Mana/
+		break
+	end
+}
+xp_now['time'] = Time.now.to_i
+if CharSettings['realtime'] == :start
+	CharSettings['realtime'] = Hash.new
+	CharSettings['realtime']['time'] = Time.now.to_i
+	CharSettings['realtime']['exp'] = xp_now['exp']
+	CharSettings['realtime']['fame'] = xp_now['fame']
+end
+
+unless $xp['first']
+	$xp = {}
+	$xp['first'] = xp_now
+	$xp['last'] = xp_now
+	respond 'No information to show you yet.  Try again later.'
+	exit
+end
+unless (xp_now['exp'] - $xp['first']['exp']) > 0
+	respond 'No information to show you yet.  Try again later.'
+	exit
+end
+
+if CharSettings['realtime']
+	seconds_since_realtime  = Time.now.to_i - CharSettings['realtime']['time']
+	xp_since_realtime       = xp_now['exp'] - CharSettings['realtime']['exp']
+	if xp_since_realtime == 0
+		xp_since_realtime_avg = 0
+	else
+		xp_since_realtime_avg = (xp_since_realtime * (3600 / seconds_since_realtime.to_f)).to_i.round
+	end
+	fame_since_realtime     = xp_now['fame'] - CharSettings['realtime']['fame']
+	if fame_since_realtime == 0
+		fame_since_realtime_avg = 0
+	else
+		fame_since_realtime_avg = (fame_since_realtime * (3600 / seconds_since_realtime.to_f)).to_i.round
+	end
+end
+
+seconds_since_first  = xp_now['time'] - $xp['first']['time']
+xp_since_first       = xp_now['exp'] - $xp['first']['exp']
+xp_since_first_avg   = (xp_since_first * (3600 / seconds_since_first.to_f)).to_i.round
+fame_since_first     = xp_now['fame'] - $xp['first']['fame']
+fame_since_first_avg = (fame_since_first * (3600 / seconds_since_first.to_f)).to_i.round
+
+seconds_since_last  = xp_now['time'] - $xp['last']['time']
+xp_since_last       = xp_now['exp'] - $xp['last']['exp']
+xp_since_last_avg   = (xp_since_last * (3600 / seconds_since_last.to_f)).to_i.round
+fame_since_last     = xp_now['fame'] - $xp['last']['fame']
+fame_since_last_avg = (fame_since_last * (3600 / seconds_since_last.to_f)).to_i.round
+
+xp_until_goal = xp_goal - xp_now['exp']
+
+format_hours_until = proc { |hours_until|
+	difference = (hours_until * 3600).to_i
+	seconds    =  difference % 60
+	difference = (difference - seconds) / 60
+	minutes    =  difference % 60
+	difference = (difference - minutes) / 60
+	hours      =  difference % 24
+	days       = (difference - hours) / 24
+	temp = Array.new
+	temp.push "#{days} day#{'s' unless days == 1}" if days > 0
+	temp.push "#{hours} hour#{'s' unless hours == 1}" if hours > 0
+	temp.push "#{minutes} minute#{'s' unless minutes == 1}" if minutes > 0
+	temp.push "#{seconds} second#{'s' unless seconds == 1}" if (seconds > 0) and (days == 0)
+	temp.join(', ')
+}
+
+if xp_until_next > 0
+	hours_until_next = xp_until_next / xp_since_first_avg.to_f
+	difference = (hours_until_next * 3600).to_i
+	seconds    =  difference % 60
+	difference = (difference - seconds) / 60
+	minutes    =  difference % 60
+	difference = (difference - minutes) / 60
+	hours      =  difference % 24
+	days       = (difference - hours) / 24
+	temp = Array.new
+	temp.push "#{days} day#{'s' unless days == 1}" if days > 0
+	temp.push "#{hours} hour#{'s' unless hours == 1}" if hours > 0
+	temp.push "#{minutes} minute#{'s' unless minutes == 1}" if minutes > 0
+	temp.push "#{seconds} second#{'s' unless seconds == 1}" if (seconds > 0) and (days == 0)
+	time_until_next = temp.join(', ')
+end
+
+if xp_until_goal > 0
+	hours_until_goal = xp_until_goal / xp_since_first_avg.to_f
+	difference = (hours_until_goal * 3600).to_i
+	seconds    =  difference % 60
+	difference = (difference - seconds) / 60
+	minutes    =  difference % 60
+	difference = (difference - minutes) / 60
+	hours      =  difference % 24
+	days = (difference - hours) / 24
+	temp = Array.new
+	temp.push "#{days} day#{'s' unless days == 1}" if days > 0
+	temp.push "#{hours} hour#{'s' unless hours == 1}" if hours > 0
+	temp.push "#{minutes} minute#{'s' unless minutes == 1}" if minutes > 0
+	temp.push "#{seconds} second#{'s' unless seconds == 1}" if (seconds > 0) and (days == 0)
+	time_until_goal = temp.join(', ')
+end
+
+if CharSettings['realtime'] and xp_until_goal > 0
+	hours_until_goal = xp_until_goal / xp_since_realtime_avg.to_f
+	difference = (hours_until_goal * 3600).to_i
+	seconds    =  difference % 60
+	difference = (difference - seconds) / 60
+	minutes    =  difference % 60
+	difference = (difference - minutes) / 60
+	hours      =  difference % 24
+	days = (difference - hours) / 24
+	temp = Array.new
+	temp.push "#{days} day#{'s' unless days == 1}" if days > 0
+	temp.push "#{hours} hour#{'s' unless hours == 1}" if hours > 0
+	temp.push "#{minutes} minute#{'s' unless minutes == 1}" if minutes > 0
+	temp.push "#{seconds} second#{'s' unless seconds == 1}" if (seconds > 0) and (days == 0)
+	realtime_until_goal = temp.join(', ')
+end
+
+lines = Array.new
+lines.push "\n"
+lines.push " Exp. Gained   Avg per Hour    Fame Gained   Avg per Hour"
+if CharSettings['realtime']
+	lines.push "#{xp_since_realtime.to_s.rjust(12)}   #{xp_since_realtime_avg.to_s.rjust(12)}   #{fame_since_realtime.to_s.rjust(12)}   #{fame_since_realtime_avg.to_s.rjust(12)}   (#{(seconds_since_realtime / 60.0).as_time} since realtime)"
+end
+lines.push "#{xp_since_first.to_s.rjust(12)}   #{xp_since_first_avg.to_s.rjust(12)}   #{fame_since_first.to_s.rjust(12)}   #{fame_since_first_avg.to_s.rjust(12)}   (#{(seconds_since_first / 60.0).as_time} since first)"
+lines.push "#{xp_since_last.to_s.rjust(12)}   #{xp_since_last_avg.to_s.rjust(12)}   #{fame_since_last.to_s.rjust(12)}   #{fame_since_last_avg.to_s.rjust(12)}   (#{(seconds_since_last / 60.0).as_time} since last)"
+lines.push "\n"
+if xp_until_next > 0
+	if capped
+		lines.push "At this rate, you'll gain training points in #{time_until_next}."
+	else
+		lines.push "At this rate, you'll train in #{time_until_next}."
+	end
+end
+if xp_until_goal > 0
+	lines.push "At this rate, you'll reach your goal of #{xp_goal.to_s.reverse.scan(/(?:\d*\.)?\d{1,3}-?/).join(',').reverse} experience in #{time_until_goal}."
+end
+if CharSettings['realtime'] and xp_until_goal > 0
+	lines.push "At this rate (realtime), you'll reach your goal of #{xp_goal.to_s.reverse.scan(/(?:\d*\.)?\d{1,3}-?/).join(',').reverse} experience in #{realtime_until_goal}."
+end
+lines.push ''
+$xp['last'] = xp_now
+respond lines

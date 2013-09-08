@@ -1,0 +1,126 @@
+=begin
+
+	Cast at something with rapid fire until it dies.
+
+	tillmen@lichproject.org
+
+=end
+
+mana_cost = {
+	'901' => 1,
+	'903' => 3,
+	'904' => 4,
+	'905' => 5,
+	'906' => 6,
+	'907' => 7,
+	'908' => 8,
+	'910' => 10,
+	'505' => 5,
+	'510' => 10,
+	'518' => 18,
+	'917' => 22
+}
+
+
+spell_num_to_name = {
+	'505' => 'Hand of Tonis',
+	'510' => 'Hurl Boulder',
+	'518' => 'Cone of Lightning',
+	'901' => 'Minor Shock',
+	'903' => 'Minor Water',
+	'904' => 'Minor Acid',
+	'906' => 'Minor Fire',
+	'907' => 'Major Cold',
+	'908' => 'Major Fire',
+	'910' => 'Major Shock',
+	'917' => 'Boil Earth'
+}
+
+
+#
+# check the spell number and target, or make some up
+#
+if script.vars[2]
+	spell = script.vars[1]
+	target = script.vars[2..-1].join(' ')
+elsif script.vars[1]
+	spell = script.vars[1]
+	target = 'target'
+else
+	spell = '901'
+	target = 'target'
+end
+#
+# if it's not a bolt spell, exit
+#
+unless mana_cost[spell]
+	echo '#{spell} is not a valid bolt spell.'
+	exit
+end
+#
+# Cast rapid fire if it's not already up
+#
+until checkspell(515)
+	Spell[515].cast
+	sleep 1
+	waitcastrt?
+end
+#
+# check mana
+#
+unless mana(mana_cost[spell])
+	echo 'Not enough mana.'
+	exit
+end
+#
+# release a spell if a different one is already prepared
+#
+if (checkprep != 'None') && (checkprep != spell_num_to_name[spell])
+	dothistimeout 'release', 5, /^You feel the magic of your spell rush away from you\.$|^You don't have a prepared spell to release!$/
+end
+#
+# prepare the spell
+#
+unless checkprep == spell_num_to_name[spell]
+	begin
+	prepare_result = dothistimeout 'prepare ' + spell, 5, /^You already have a spell readied!  You must RELEASE it if you wish to prepare another!$|^You can't think clearly enough to prepare a spell!$|^Your spell is ready\.(   [Spell is stored])?$/
+		if prepare_result == 'You already have a spell readied!  You must RELEASE it if you wish to prepare another!'
+			dothistimeout 'release', 5, /^You feel the magic of your spell rush away from you\.$|^You don't have a prepared spell to release!$/
+		elsif prepare_result == "You can't think clearly enough to prepare a spell!" || prepare_result == nil
+			exit
+		end
+	end until prepare_result =~ /^Your spell is ready\.(   [Spell is stored])?$/
+end
+#
+# change stance
+#
+unless (checkstance == 'offensive') or (spell == '917')
+	stance_result = dothistimeout 'stance offensive', 2, /^You are now in an offensive stance\.$/
+	if stance_result == nil
+		fput 'stance guarded'
+		exit
+	end
+end
+#
+# cast a lot
+#
+if target == 'target'
+	begin
+		cast_result = dothistimeout 'cast target', 2, /^Cast Roundtime 3 Seconds\.$|^Your armor prevents the spell from working correctly\.$|^You don't have a spell prepared!$|^Cast at what\?$/
+	end while ( cast_result == 'Cast Roundtime 3 Seconds.' ) && checkmana(mana_cost[spell])
+else
+	begin
+		cast_result = dothistimeout 'cast ' + target, 2, /^Cast Roundtime 3 Seconds\.$|^Your armor prevents the spell from working correctly\.$|^You don't have a spell prepared!$|^Cast at what\?$|^A little bit late for that don't you think\?$|goes still\.$|crumbles into a pile of rubble\.$|and dies\.$|lying still\.$|goes still\.$|shudders, then topples to the ground\.$|topples to the ground motionless\.$|^The body twitches slightly in response\.$/
+		echo cast_result
+	end while ( cast_result == 'Cast Roundtime 3 Seconds.' ) && checkmana(mana_cost[spell])
+end
+
+#But it is dead!
+
+#
+# done
+#
+dothistimeout 'stance guarded', 3, /^You are now in a guarded stance\.$|^You are unable to change your stance\.$/
+unless (checkprep == 'None') or checkspell(515)
+	dothistimeout 'release', 5, /^You feel the magic of your spell rush away from you\.$|^You don't have a prepared spell to release!$/
+end

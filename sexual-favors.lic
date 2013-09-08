@@ -1,0 +1,1446 @@
+=begin
+
+	I think you know what this script does...
+
+	1 favor is defined as the amount of favor it takes to do "sym thought ab",
+	which is equivalent to 1/1000th of a globe revolution.
+
+	This script keeps track of favor gained and used.
+	Set the script as a favorite.  Type "favor" with the script running.
+
+	Type "favor clear" to set symbol favor to 0.
+	Type "favor set <amount>" to set symbol favor to something else.
+	Touch the globe to raise or lower symbol favor to the correct range.
+
+	Favor costs are accurate for levels 3 through 38, and 100.  The other levels
+	are guessed, but won't be too far off.  Still working on getting them perfect.
+	You can help by running	the measure-favor script.
+
+	Favor gain formula is accurate, but the undead level is not always known.  The
+	script may use the undead's TD to calculate the exact level.  Calculating the
+	exact level for other hunting methods may not be practical.
+
+	The script can tell the difference between kill favor and spectator favor, but
+	only for attacks that the script knows about.  If you land the killing blow and
+	the script reports it as spectator favor, send me a log of it and I'll fix it.
+
+	Favor needed to step is accurate only for level 3.  Other levels are estimated.
+
+	The script will check the weapon name when you use symbol of blessing to figure
+	out which blessing cost to use.  It's only looking for a magical metal or wood
+	in the weapon name.  If it's wrong, let me know and I'll try to fix it.
+
+	tillmen@lichproject.org
+
+=end
+
+hide_me
+script.want_downstream = false
+script.want_downstream_xml = true
+
+if Char.name == 'Useless'
+	globe_sets_favor = false
+else
+	globe_sets_favor = true
+end
+
+$favor                    = CharSettings.to_hash
+$favor[:symbol]         ||= 0
+$favor[:step]           ||= 0
+start_time                = Time.now
+start_step_favor          = $favor[:step]
+start_symbol_favor        = $favor[:symbol]
+guessed_globe             = nil
+npc_td                    = LimitedArray.new
+npc_td.max_size           = 50
+immolated                 = LimitedArray.new
+immolated.max_size        = 15
+weapon_fired              = LimitedArray.new
+weapon_fired.max_size     = 15
+maelstromed               = LimitedArray.new
+maelstromed.max_size      = 15
+lightning_called          = LimitedArray.new
+lightning_called.max_size = 15
+banshee_defence           = LimitedArray.new
+banshee_defence.max_size  = 15
+deity                     = nil
+divine_wrath_active       = false
+
+npc = {
+	'lesser ghoul'         => { :lvl =>   1 },
+	'skeleton'             => { :lvl =>   1 },
+	'zombie rolton'        => { :lvl =>   1 },
+	'frost shade'          => { :lvl =>   2 },
+	'moaning phantom'      => { :lvl =>   2 },
+	'ghost'                => { :lvl =>   2 },
+	'lesser shade'         => { :lvl =>   2 },
+	'phantom'              => { :lvl =>   2 },
+	'greater ghoul'        => { :lvl =>   3 },
+	'ice skeleton'         => { :lvl =>   3 },
+	'revenant'             => { :lvl =>   4 },
+	'mist wraith'          => { :lvl =>   4 },
+	'dark apparition'      => { :lvl =>   5 },
+	'spectral fisherman'   => { :lvl =>   6 },
+	'lesser mummy'         => { :lvl =>   6 },
+	'firephantom'          => { :lvl =>   6 },
+	'bone golem'           => { :lvl =>   8 },
+	'snow spectre'         => { :lvl =>   9 },
+	'death dirge'          => { :lvl =>   9 },
+	'werebear'             => { :lvl =>  10 },
+	'darkwoode'            => { :lvl =>  13 },
+	'shadowy spectre'      => { :lvl =>  14 },
+	'specter'              => { :lvl =>  14 },
+	'wolfshade'            => { :lvl =>  15 },
+	'tomb wight'           => { :lvl =>  15 },
+	'wraith'               => { :lvl =>  15 },
+	'ghoul master'         => { :lvl =>  16 },
+	'ghost wolf'           => { :lvl =>  16 },
+	'elder ghoul master'   => { :lvl =>  18 },
+	'ghostly warrior'      => { :lvl =>  18 },
+	'nedum vereri'         => { :lvl =>  18 },
+	'krolvin pirate'       => { :lvl =>  18 },
+#	                                                          mnsp mjsp clrc mnel mjel rngr sorc      wzrd bard emph mnme                pldn
+	'arch wight'           => { :lvl =>  20, :td_mod => [ nil,   0,   0,   0,   0, nil, nil,   0, nil, nil, nil, nil, nil, nil, nil, nil, nil ] }, # Graveyard, Wehnimer's Landing
+	'wood wight'           => { :lvl =>  20, :td_mod => [ nil,   0,   0,   0,   3, nil, nil,   1, nil, nil, nil, nil, nil, nil, nil, nil, nil ] }, # Marshtown, Solhaven
+	'ancient ghoul master' => { :lvl =>  21, :td_mod => [ nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil ] }, # Graveyard, Wehnimer's Landing
+	'zombie'               => { :lvl =>  23, :td_mod => [ nil,   3,   3,   1,   8, nil, nil,   5, nil, nil, nil, nil,   0, nil, nil, nil, nil ] }, # Danjirland, Wehnimer's Landing + Icemule Environs, Icemule Trace
+	'nonomino'             => { :lvl =>  23, :td_mod => [ nil,   0,   0,  -2,   9, nil, nil,   3, nil, nil, nil, nil, nil, nil, nil, nil, nil ] }, # Castle Anwyn, Wehnimer's Landing
+	'niirsha'              => { :lvl =>  23, :td_mod => [ nil,  -5,  -5,  -7,   9,   8, nil, nil, nil,   8, nil, nil, nil, nil, nil, nil, nil ] }, # Lunule Weald, Ta'Vaalor
+	'crazed zombie'        => { :lvl =>  23, :td_mod => [ nil,   3,   3,   1,   8,   7, nil, nil, nil,   7, nil, nil, nil, nil, nil, nil, nil ] }, # Lunule Weald, Ta'Vaalor
+	'rotting woodsman'     => { :lvl =>  23, :td_mod => [ nil,   3,   3,   1,   8, nil, nil,   5, nil, nil, nil, nil, nil, nil, nil, nil, nil ] }, # Marshtown, Solhaven
+	'night hound'          => { :lvl =>  24, :td_mod => [ nil,  29,  29,  27, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil ] }, # Graveyard, Wehnimer's Landing
+	'spectral monk'        => { :lvl =>  25, :td_mod => [ nil,  15,  15,  13, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil ] }, # The Monastery, Wehnimer's Landing
+	'carceris'             => { :lvl =>  25, :td_mod => [ nil,   7,   7,   5, nil, nil, nil,   8, nil, nil, nil, nil, nil, nil, nil, nil, nil ] }, # Castle Anwyn, Wehnimer's Landing
+	'tree spirit'          => { :lvl =>  26, :td_mod => [ nil,   6,   6,   4, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil ] }, # Lunule Weald, Ta'Vaalor + Foggy Valley, Solhaven + Danjirland, Wehnimer's Landing
+	'monastic lich'        => { :lvl =>  27, :td_mod => [ nil,  24,  24,  23, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil ] }, # The Monastary, Wehnimer's landing
+	'moaning spirit'       => { :lvl =>  28, :td_mod => [ nil,   9,   9,   7, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil ] }, # Castle Anwyn, Wehnimer's landing + The Graveyard, Wehnimer's Landing
+	'elder tree spirit'    => { :lvl =>  30, :td_mod => [ nil,  21,  21,  19, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil ] }, # Icemule Environs, Icemule Trace
+	'ice troll'            => { :lvl =>  31, :td_mod => [ nil,   0,   0,   0, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil ] }, # Frozen Battlefield, Icemule Trace
+	'ghostly mara'         => { :lvl =>  32, :td_mod => [ nil,  11,  11,  10,  13,  14, nil, nil, nil,  14, nil, nil, nil, nil, nil, nil, nil ] }, # Wraithenmist, Ta'Illistim
+	'rotting farmhand'     => { :lvl =>  32, :td_mod => [ nil,   8,   8,   7, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil ] }, # Icemule Environs, Icemule Trace
+	'rotting corpse'       => { :lvl =>  32, :td_mod => [ nil,  13,  13,  12,  23, nil, nil,  18, nil, nil, nil, nil, nil, nil, nil, nil, nil ] }, # Castle Varunar, Wehnimer's Landing/Solhaven
+	'skeletal giant'       => { :lvl =>  33, :td_mod => [ nil,   7,   7,   6, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil ] }, # Sentoph, Wehnimer's Landing
+#	                                                          mnsp mjsp clrc mnel mjel rngr sorc      wzrd bard emph mnme                pldn
+	'ghostly pooka'        => { :lvl =>  33, :td_mod => [ nil,  11,  11,  10, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil ] }, # Shadow Valley, Wehnimer's Landing
+	'troll zombie'         => { :lvl =>  34, :td_mod => [ nil,  15,  15,  14,  27,  27, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil ] }, # Troll Burial Grounds, Zul Logoth
+	'skeletal soldier'     => { :lvl =>  34, :td_mod => [ nil,   7,   7,   6,  19,  19, nil, nil, nil,  19, nil, nil, nil, nil, nil, nil, nil ] }, # Miasmal Forest, River's Rest
+	'skeletal warrior'     => { :lvl =>  34, :td_mod => [ nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil ] }, # fixme: does this exist?
+	'spectral warrior'     => { :lvl =>  34, :td_mod => [ nil,   0,   0,   0,   1,   1, nil, nil, nil,   1, nil, nil, nil, nil, nil, nil, nil ] }, # The Citadel, River's Rest
+	'troll wraith'         => { :lvl =>  35, :td_mod => [ nil,  11,  11,  11,   8,   8, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil ] }, # Troll Burial Grounds, Zul Logoth
+	'spectral shade'       => { :lvl =>  35, :td_mod => [ nil,  24,  24,  24, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil ] }, # Foggy Valley, Solhaven
+	'barghest'             => { :lvl =>  35, :td_mod => [ nil,  16,  16,  16,  29,  29, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil ] }, # Black Moor, Ta'Illistim
+	'spectral woodsman'    => { :lvl =>  35, :td_mod => [ nil,  19,  19,  19, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil ] }, # Icemule Environs, Icemule Trace
+	'spectral lord'        => { :lvl =>  36, :td_mod => [ nil,   0,   0,   0,   5,   6, nil, nil, nil,   6, nil, nil, nil, nil, nil, nil, nil ] }, # Wraithenmist, Ta'Illistim
+	'shadow mare'          => { :lvl =>  37, :td_mod => [ nil,  -1,  -1,  -2, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil ] }, # Shadow Valley, Wehnimer's Landing
+	'skeletal warhorse'    => { :lvl =>  37, :td_mod => [ nil,   0,   0,   0,   0, nil, nil,   0, nil, nil, nil, nil, nil, nil, nil, nil, nil ] }, # Castle Varunar, Wehnimer's Landing/Solhaven
+	'lesser moor wight'    => { :lvl =>  37, :td_mod => [ nil,  -1,  -1,  -2,  14,  14, nil, nil, nil,  14, nil, nil, nil, nil, nil, nil, nil ] }, # Miasmal Forest, River's Rest
+	'shadow steed'         => { :lvl =>  38, :td_mod => [ nil,  18,  18,  17, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil ] }, # Shadow Valley, Wehnimer's Landing
+	'vourkha'              => { :lvl =>  39, :td_mod => [ nil,  21,  21,  21,  25,  26, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil ] }, # Black Moor, Ta'Illistim
+	'greater moor wight'   => { :lvl =>  39, :td_mod => [ nil,  28,  28,  28,  44,  45, nil, nil, nil,  45, nil, nil, nil, nil, nil, nil, nil ] }, # Black Moor, Ta'Illistim + Miasmal Forest, River's Rest
+	'spectral miner'       => { :lvl =>  40, :td_mod => [ nil,   7,   7,   7, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil ] }, # Shadow Valley, Wehnimer's Landing
+	'bog wraith'           => { :lvl =>  41, :td_mod => [ nil, -50, -50, -50,  13,  13, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil ] }, # Miasmal Forest, River's Rest
+#	                                                          mnsp mjsp clrc mnel mjel rngr sorc      wzrd bard emph mnme                pldn
+	'skeletal lord'        => { :lvl =>  41, :td_mod => [ nil,   0,   0,   0,  15, nil, nil,   7, nil, nil, nil, nil, nil, nil, nil, nil, nil ] }, # Castle Varunar, Wehnimer's Landing/Solhaven
+	'phantasma'            => { :lvl =>  42, :td_mod => [ nil,   0,   0,   1, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil ] }, # Castle Varunar, Wehnimer's Landing/Solhaven
+	'baesrukha'            => { :lvl =>  42, :td_mod => [ nil,  16,  16,  16,  12,  12, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil ] }, # Black Moor, Ta'Illistim
+	'frozen corpse'        => { :lvl =>  42, :td_mod => [ nil,  16,  16,  17, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil ] }, # Nightmare Gorge, Wehnimer's Landing + Artic Tundra, Pinefar
+	'night mare'           => { :lvl =>  43, :td_mod => [ nil, -14, -14, -13, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil ] }, # Shadow Valley, Wehnimer's Landing
+	'spectral servant'     => { :lvl =>  44, :td_mod => [ nil,  36,  36,  37,  54,  55, nil, nil, nil,  55, nil, nil, nil, nil, nil, nil, nil ] }, # Marsh Keep, River's Rest
+	'bog wight'            => { :lvl =>  44, :td_mod => [ nil,  12,  12,  13,  30,  31, nil, nil, nil,  31, nil, nil, nil, nil, nil, nil, nil ] }, # Fethayl Bog, Ta'Vaalor
+	'ice wraith'           => { :lvl =>  45, :td_mod => [ nil,  31,  31,  31, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil ] }, # Nightmare Gorge, Wehnimer's Landing + Artic Tundra, Pinefar
+	'lesser vruul'         => { :lvl =>  45, :td_mod => [ nil,  -5,  -5,  -5, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil ] }, # The Broken Lands, Wehnimer's Landing # immune to 400's, 500's, 900's
+	'rotting chimera'      => { :lvl =>  46, :td_mod => [ nil,  29,  29,  30,  41,  42, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil ] }, # Marsh Keep, River's Rest
+	'dybbuk'               => { :lvl =>  48, :td_mod => [ nil,  31,  31,  32, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil ] }, # Bonespear Tower, Solhaven
+	'necrotic snake'       => { :lvl =>  48, :td_mod => [ nil,  31,  31,  32,  51,  52, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil ] }, # Marsh Keep, River's Rest
+	'warrior shade'        => { :lvl =>  48, :td_mod => [ nil,  31,  31,  32,  51,  52, nil, nil, nil,  52, nil, nil, nil, nil, nil, nil, nil ] }, # Fethayl Bog, Ta'Vaalor
+	'waern'                => { :lvl =>  49, :td_mod => [ nil,  32,  32,  33, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil ] }, # Bonespear Tower, Solhaven
+	'banshee'              => { :lvl =>  50, :td_mod => [ nil,  43,  43,  45, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil ] }, # Darkstone Castle, Wehnimer's Landing + Fhorian Village
+	'flesh golem'          => { :lvl =>  50, :td_mod => [ nil,  33,  33,  35,  54,  55, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil ] }, # Marsh Keep, River's Rest
+	'seeker'               => { :lvl =>  52, :td_mod => [ nil,  31,  31,  33, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil ] }, # Mount Aenatumgana, Pinefar
+	'mage apprentice'      => { :lvl =>  54, :td_mod => [ nil,  48,  48,  50,  71,  72, nil, nil, nil,  72, nil, nil, nil, nil, nil, nil, nil ] }, # The Citadel, River's Rest
+	'nightmare steed'      => { :lvl =>  55, :td_mod => [ nil,  49,  49,  51, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil ] }, # Darkstone Castle, Wehnimer's Landing + The Broken Lands, Wehnimer's Landing
+	'eidolon'              => { :lvl =>  55, :td_mod => [ nil,  27,  27,  29, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil ] }, # Bonespear Tower, Solhaven
+#	                                                          mnsp mjsp clrc mnel mjel rngr sorc      wzrd bard emph mnme                pldn
+	'Citadel guardsman'    => { :lvl =>  56, :td_mod => [ nil,  13,  13,  15,  37,  38, nil, nil, nil,  38, nil, nil, nil, nil, nil, nil, nil ] }, # The Citadel, River's Rest
+	'Citadel arbalester'   => { :lvl =>  58, :td_mod => [ nil,  25,  25,  28,  50,  52, nil, nil, nil,  52, nil, nil, nil, nil, nil, nil, nil ] }, # The Citadel, River's Rest
+	'Citadel herald'       => { :lvl =>  60, :td_mod => [ nil,  56,  56,  59,  83,  84, nil, nil, nil,  84, nil, nil, nil, nil, nil, nil, nil ] }, # The Citadel, River's Rest
+	'bestial swordsman'    => { :lvl =>  62, :td_mod => [ nil,  47,  47,  50,  74,  76, nil, nil, nil,  76, nil, nil, nil, nil, nil, nil, nil ] }, # The Citadel, River's Rest
+	'soul golem'           => { :lvl =>  63, :td_mod => [ nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil ] }, # Temple of Luukos, Teras Isle
+	'wind wraith'          => { :lvl =>  63, :td_mod => [ nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil ] }, # Temple of Luukos, Teras Isle
+	'greater vruul'        => { :lvl =>  75, :td_mod => [ nil,  -5,  -5,  -5, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil ] }, # The Broken Lands, Wehnimer's Landing # immune to 400's, 500's, 900's
+	'naisirc'              => { :lvl =>  75, :td_mod => [ nil,  71,  71,  76, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil ] }, # The Rift, Pinefar
+	'shrickhen'            => { :lvl =>  76, :td_mod => [ nil,  63,  63,  68,  88,  91, nil, nil, nil,  91, nil, nil, nil, nil, nil, nil, nil ] }, # Blighted Forest, Ta'Illistim
+	'seraceris'            => { :lvl =>  78, :td_mod => [ nil,  41,  41,  46, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil ] }, # The Rift, Pinefar
+	"lich qyn'arj"         => { :lvl =>  84, :td_mod => [ nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil ] },
+	"n'ecare"              => { :lvl =>  87, :td_mod => [ nil,  59,  59,  65, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil ] }, # The Rift, Pinefar
+	'lost soul'            => { :lvl =>  91, :td_mod => [ nil,  82,  82,  89, 106, 109, nil, nil, nil, 109, nil, nil, nil, nil, nil, nil, nil ] }, # The Rift, Pinefar
+	'vaespilon'            => { :lvl =>  93, :td_mod => [ nil,  46,  46,  54,  90,  93, nil, nil, nil,  93, nil, nil, nil, nil, nil, nil, nil ] }, # The Rift, Pinefar
+	'fallen crusader'      => { :lvl =>  97, :td_mod => [ nil,  -8,  -8,   0,  57,  60, nil, nil, nil,  60, nil, nil, nil, nil, nil, nil, nil ] }, # The Rift, Pinefar
+	'triton defender'      => { :lvl =>  98, :td_mod => [ nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil ] }, # Temple Nelemar, Teras Isle
+	'triton sentry'        => { :lvl => 103, :td_mod => [ nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil ] }, # Temple Nelemar, Teras Isle
+	'soul siphon'          => { :lvl => 106, :td_mod => [ nil, 103, 103, 112, 135, 139, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil ] }, # The Rift, Icemule
+	'infernal lich'        => { :lvl => 110, :td_mod => [ nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil ] }, # The Rift, Icemule
+	'frostborne lich'      => { :lvl => 110, :td_mod => [ nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil ] }, # The Rift, Icemule
+}
+
+spell_bonus = {
+#	                                                                mnsp mjsp clrc mnel mjel rngr sorc      wzrd bard emph mnme                pldn
+	/^The light blue glow leaves/                          => [ nil,  10,  10,  10,   5,   5,  10,   8, nil,   5,   5,  10, nil, nil, nil, nil,  10 ], # 101
+	/^The deep blue glow leaves/                           => [ nil,  15,  15,  15,   7,   7,  15,  11, nil,   7,   7,  15, nil, nil, nil, nil,  15 ], # 107
+	/^The very powerful look leaves/                       => [ nil,  20,  20,  20,  10,  10,  20,  15, nil,  10,  10,  20, nil, nil, nil, nil,  20 ], # 120
+#	/^The white light leaves/                              => [ nil,  20,  20,  20,  10,  10,  20,  15, nil,  10,  10,  20, nil, nil, nil, nil,  20 ], # 120 gives two messages
+	/^The opalescent aura fades from around/               => [ nil,  30,  30,  30,  15,  15,  30,  22, nil,  15,  15,  30, nil, nil, nil, nil,  30 ], # 219
+	/seems slightly different\.$/                          => [ nil,  20,  20,  20,  10,  10,  20,  15, nil,  10,  10,  20, nil, nil, nil, nil,  20 ], # 310
+	/^A subtle light fades from/                           => [ nil,  10,  10,  10,   5,   5,  10,   8, nil,   5,   5,  10, nil, nil, nil, nil,  10 ], # 313
+	/^The silvery luminescence fades from around/          => [ nil,   2,   2,   2,   5,   5,   2,   4, nil,   5,   5,   2, nil, nil, nil, nil,   2 ], # 401
+	/^The bright luminescence fades from around/           => [ nil,   5,   5,   5,  10,  10,   5,   8, nil,  10,  10,   5, nil, nil, nil, nil,   5 ], # 406
+	/^The brilliant luminescence fades from around/        => [ nil,   7,   7,   7,  15,  15,   7,  11, nil,  15,  15,   7, nil, nil, nil, nil,   7 ], # 414
+	/^The tingling sensation and sense of security leaves/ => [ nil,  15,  15,  15,  30,  30,  15, nil, nil,  30,  30,  15, nil, nil, nil, nil,  15 ], # 430
+	/appears somehow different\.$/                         => [ nil,  10,  10,  10,  20,  20,  10,  15, nil,  20,  20,  10, nil, nil, nil, nil,  10 ], # 508
+	/seems to lose an aura of confidence\.$/               => [ nil,  20,  20,  20,  10,  10,  20,  15, nil,  10,  10,  20, nil, nil, nil, nil,  20 ], # 613
+	# fixme: 625
+	/^A shadow seems to detach itself from/                => [ nil,  27,  27,  27,  13,  13,  20,  15, nil,  13,  13,  27, nil, nil, nil, nil,  27 ], # 712 # fixme
+#	/^A luminescent aura fades from around/                => [ ? ] # 913
+	# fixme: 1109
+	# fixme: 1119
+	# fixme: 1208
+	# fixme: 1601
+	# fixme: 1619
+}
+
+divine_wrath_message = {
+	'Charl'           => /^White sparks flicker around you, and you sense electrical energy gathering in the instant before a massive bolt of lightning spears toward/,
+	'Cholen'          => /^A throwing knife formed of shimmering golden light hurtles from the hand of one of the spirit jesters toward/,
+	'Eonak'           => /^Within the reddish haze swirling beside/,
+	'Imaera'          => /^A brown stag materializes in midair, leaping out of nowhere to try to impale/,
+	'Jastev'          => /^A beam of .*? light lances away from the rainbow around you to strike/,
+	'Koar'            => /^An aura of divine golden light blazes into existence around/,
+	'Lorminstra'      => /^As several faintly glowing snowflakes settle upon/,
+	'Lumnis'          => /^Guided by the knowledge within you, you concentrate upon/,
+	'Ronan'           => /^Seen only by your spirit gaze, one of the dream unicorns lowers its head and charges fiercely toward/,
+	'Tonis'           => /^Accompanied by a particularly impressive gust of wind, a fleeting golden blur flashes past/,
+	'Gosaena'         => /^An ethereal pair of feathered white wings materializes from midair and closes around/,
+	'Zelia'           => /^You notice .*? nearby\. How marvelous!/,
+	'Eorgina'         => /^Shimmering black flames lash out toward/,
+	'Fash\'lo\'nae'   => /^A matte grey scalpel appears from midair, and it moves with evident purpose to take a deliberate, methodical slice at/,
+	'Luukos'          => /^Long, spectral talons materialize from midair to tear viciously at the body of/,
+	'Marlu'           => /^A tendril of black mist suddenly senses the proximity of/,
+	'Mularos'         => /^The ethereal barbed whip that lies loosely coiled around you uncoils at terrifying speed\. It snaps out toward/,
+	'Sheru'           => /^Suddenly, .*? tries to bolt away, but instead smashes into a wall of spectral force hidden within the shadows!/,
+	'V\'tull'         => /^Divine will surges through you, and you command the scimitar to strike at/,
+	'the Huntress'    => /^A silver-bladed scythe materializes from thin air, spinning end over end as it hurtles toward/,
+	'Laethe'          => /^A shadowy black rose touches/,
+	'Leya'            => /^A dagger of ivory light suddenly flashes away from the aura surrounding you to strike at/,
+	'Niima'           => /^As the song from the pillar of water crescendos, it reaches a pitch that normally only trained bards can achieve, and the intense waves of elegant sound focus upon/,
+	'Voaris'          => /^A glowing golden rose touches/,
+	# fixme: missing Kai, Oleani, Phoen, Andelas, Ivas, Aeia, Amasalen, Arachne, Jaston, Kuon, Onar, Tilamaire, Voln
+}
+
+spell_circle_list = [ 1, 2, 3, 4, 5, 6, 7, 9, 10, 11, 12, 16 ]
+
+add_commas = proc { |num|
+	num.to_s.reverse.scan(/(?:\d*\.)?\d{1,3}-?/).join(',').reverse
+}
+
+globe_offset = proc {
+	if XMLData.level > 38 and XMLData.level < 100
+		guessed_globe = true
+	else
+		guessed_globe = false
+	end
+	([[(XMLData.level-30),0].max, 68].min/4.0).ceil + ([([XMLData.level,30].min-10),0].max/5.0).ceil
+}
+
+subtract_favor = proc { |symbol_factor|
+	if XMLData.level > 38 and XMLData.level < 100
+		guessed_str = ' (guessed)'
+	else
+		guessed_str = String.new
+	end
+	cost = ((-3.5582503162159274e-001 * XMLData.level**0 + 2.2957964748856852e-001 * XMLData.level**1 + 1.1029166002049873e-001 * XMLData.level**2 + -3.6503722958574330e-003 * XMLData.level**3 + 7.3012042689120181e-005 * XMLData.level**4 + -7.6807923677936175e-007 * XMLData.level**5 + 3.1218083213686857e-009 * XMLData.level**6) * symbol_factor).ceil
+	$favor[:symbol] -= cost
+	echo "- #{cost}#{guessed_str} = #{add_commas.call($favor[:symbol])}"
+}
+
+favor_to_step = proc {
+	# (Society.rank*100)+((Society.rank/3.0).ceil*15) # formula for level 3
+	# ((Society.rank*(100/3.0)*XMLData.level).ceil)+((Society.rank/3.0).ceil*(XMLData.level-2)*15) # couldn't possibly be right
+	(Society.rank*100)+((Society.rank/3.0).ceil*(XMLData.level*1.291)**2).floor # probably sucks
+}
+
+fix_name = proc { |name|
+	if name == 'moor wight'
+		if get =~ /greater/
+			name = 'greater moor wight'
+		else
+			name = 'lesser moor wight'
+		end
+	elsif name == 'ghoul master'
+		next_line = get
+		if next_line =~ /ancient/
+			name = 'ancient ghoul master'
+		elsif next_line =~ /elder/
+			name = 'elder ghoul master'
+		end
+	end
+	name
+}
+
+hook_proc = proc { |client_string|
+	begin
+		if client_string =~ /^(?:<c>)?favor(.*)/i
+			cmd = $1
+			if cmd.downcase.strip == 'clear'
+				$favor[:symbol] = 0
+			elsif cmd =~ /^\s+set\s+([0-9]+)\s*$/i
+				$favor[:symbol] = $1.to_i
+			elsif not cmd.empty?
+				output = "\n"
+				output.concat "Usage:\n"
+				output.concat "\n"
+				output.concat "   favor                  show current favors\n"
+				output.concat "   favor clear            set current favor to zero\n"
+				output.concat "   favor set <amount>     set current favor to the given amount\n"
+				output.concat "\n"
+				respond output
+			end
+			output = "Symbol Favor: #{add_commas.call($favor[:symbol])}"
+			if Society.rank < 26
+				output.concat "  Step Favor: #{add_commas.call($favor[:step])}/#{add_commas.call(favor_to_step.call)}  (#{($favor[:step]*100)/favor_to_step.call}%)  (#{add_commas.call((($favor[:step] - start_step_favor)/((Time.now - start_time)/3600.0)).round)} f/h in #{((Time.now - start_time)/60.0).as_time})"
+			else
+				output.concat "  (#{add_commas.call((($favor[:symbol] - start_symbol_favor)/((Time.now - start_time)/3600.0)).round)} f/h in #{((Time.now - start_time)/60.0).as_time})"
+			end
+			respond output
+			nil
+		else
+			client_string
+		end
+	rescue
+		UpstreamHook.remove('sexual-favors')
+		client_string
+	end
+}
+before_dying { UpstreamHook.remove('sexual-favors') }
+UpstreamHook.add('sexual-favors', hook_proc)
+
+while (line = get)
+	# fixme: open implode
+	if line =~ /^The glow fades from .*?exist="(.*?)"/
+		banshee_defence.delete($1)
+	elsif (line =~ /You (?:swing|gesture|sing|weave another verse|continue to sing|channel|fire|wave|tap|rub|hurl|thrust|slash|throw|punch|attempt to punch|attempt to kick|attempt to throw|quickly dart behind .*? and try to hamstring|mentally attempt to locate your implanted essence|rush forward)|You .*?attempt to (?:kick|punch|jab|grapple)|A wave of power flows out of you and toward|Your (?:<.*?>)?raging sandstorm(?:<.*?>)? swirls around|^The flames surrounding <pushBold\/>an? <a exist="(?:#{immolated.join('|')})" noun=".*?">.*?<\/a><popBold\/> flare up violently\.\.\.|A .*? leaps from a <a.*?>.*?<\/a> <pushBold\/>.*?<a exist="(?:#{weapon_fired.join('|')})".*?>.*?<\/a><popBold\/> is wielding\.|^(?:Brilliant flashes of lightning surround|Large hailstones pound relentlessly on|Violent winds tighten around) <pushBold\/>.*?<a exist="(?:#{maelstromed.join('|')})" noun=".*?">.*?<\/a><popBold\/>\.|Suddenly a lightning bolt explodes from the small thundercloud and strikes <pushBold\/>.*?<a exist="(?:#{lightning_called.join('|')})" noun=".*?">.*?<\/a><popBold\/> with a brilliant flash!/) or (divine_wrath_active and divine_wrath_message[deity] and line =~ divine_wrath_message[deity])
+		if line =~ /You gesture at.*?exist=['"](.*?)['"]/
+			target_npc_id = $1
+		else
+			target_npc_id = nil
+		end
+		while (line = get) and (line !~ /<prompt/)
+			if line =~ /Wisps of black smoke swirl around <pushBold\/>.*?<a exist="(.*?)\" noun=".*?">.*?<\/a><popBold\/> and s?he bursts into flame!/
+				immolated.push($1) unless immolated.include?($1)
+			elsif line =~ /You successfully hit <pushBold\/>.*?<a exist="(.*?)".*?>.*?<\/a><popBold\/> <a.*?>.*?<\/a> with the spell\./
+				weapon_fired.push($1) unless weapon_fired.include?($1)
+			elsif line =~ /A stiff breeze begins to swirl around <pushBold\/>.*?<a exist="(.*?)" noun=".*?">.*?<\/a><popBold\/>\./
+				maelstromed.push($1) unless maelstromed.include?($1)
+			elsif line =~ /You notice a small cloud form above <pushBold\/>.*?<a exist="(.*?)" noun=".*?">.*?<\/a><popBold\/>\./
+				lightning_called.push($1)
+			elsif line =~ /^As you pour your soul into an appeal to (.*?), /
+				deity = $1
+				divine_wrath_active = true
+			elsif line =~ /^A final rumble of thunder rolls through the area, and, as its last echoes fade away, your skin ceases to tingle as your connection to Charl lessens\.|^Your connection to Cholen lessens\. The airy, brisk trill of a well-played fife and a quick cymbal crash heralds the departure of the spirit jesters\.|^The ruddy haze near you dissipates, and the sound of the forging hammer dies away\. As the forge-fire's heat leaves your skin, your connection to Eonak lessens\.|^You sense the last of the spirit animals running away unseen, and the aroma of forest loam fades as your connection to Imaera lessens\.|^The iridescent lights surrounding you pop like soap bubbles, one by one, until the last one bursts in a small flare of starry radiance and is gone\. Your connection to Jastev lessens\.|^Your connection to Koar lessens, and the divine light fades around you\. The ground shudders one last time before falling still\.|^As your connection to Lorminstra lessens, the snowflakes stop falling, and the few that still cling to you melt away\. The icy cold gradually lifts from your body\.|^As your connection to Lumnis lessens, the world of divine insight slips away from you, destroying the subtle understanding that you so briefly managed to grasp\.|^You lose sight of the dream unicorns and the barren plain upon which they run as your connection to Ronan lessens\. The waking world seems brighter again as the sense of dreamlike lassitude leaves you\.|^You glimpse the golden blur one last time, but then you lose track of it entirely as your connection to Tonis lessens\. The wind's force lessens as well, and then the air falls still\.|^You realize that you had ceased to hear the sound of your own heartbeat only when you become aware of it again, and other sounds filter back into your awareness as well\. Warmth returns to your body as your connection to Gosaena lessens\.|^Suddenly, the important insights slip away, leaving you drained and exhausted as you plummet back to a more mundane state of mind\. Your throat and sides are slightly sore, and your cheeks are wet with tears\. Your connection to Zelia has lessened\.|^Your connection to Eorgina lessens, and the black flames instantly vanish, leaving you stranded and bereft of the presence of the Arkati's power\.|^Your connection to Fash'lo'nae lessens\.  The quiet sound of a blade being honed persists a moment longer before fading away into silence\.|^A spectral howl echoes through the air, resonant with pain and anguish\. Your skin prickles again as your connection to Luukos lessens\.|^As your connection to Mularos lessens, the cold, invisible collar locked about your throat fades into a compassionate caress, and a similar caress traces its way across the side of your cheek\. Beneath that gentle touch, the wounds upon your face heal immediately\. The ethereal barbed whip twitches one last time before dissolving back into air\.|^Your connection to Sheru lessens, and the murky shadows brought by your appeal fade away, yet the feeling of being watched does not\. On any night, in any dream or nightmare, those amber eyes will follow you endlessly\.\.\. but such is the prize and the price of your devotion\.|^As your connection to the Huntress lessens, the foreign anger that lent you strength passes from your body as well, and your heartbeat returns to its regular pace\.|^You feel the kiss of benediction once more upon your brow, and then your connection to Laethe lessens\. The shadowy black roses dissolve into tendrils of black, rose-scented smoke that dissipate rapidly\.|^The ivory light around you fades and glimmers out, and the strength and control of your movements lessens along with your connection to Leya\.|^The singing from the watery pillar begins to fade as your connection to Niima lessens\. The pillar thins, then suddenly drops with a great splash! You are utterly drenched in water\.|^You feel the kiss of benediction once more upon your brow, and then your connection to Voaris lessens\. One of the glowing golden roses lights with scarlet flame, and the fire spreads rapidly down the vine until every rose is burning\. The flames consume the roses swiftly and without smoke, until, in less than a second, the roses are gone entirely\./
+				# fixme: missing Kai, Oleani, Phoen, Andelas, Ivas, Marlu, V'tull, Aeia, Amasalen, Arachne, Jaston, Kuon, Onar, Tilamaire, Voln
+				divine_wrath_active = false
+			elsif line =~ /^The .*?exist="(.*?)".*? eyes grow wide as .*? watches your gestures!  Suddenly .*? makes hurried movements as .*? recognizes that .*? is about to be attacked by magic!/
+				banshee_defence.push($1)
+			elsif line =~ /^\s*CS\: [\+\-][0-9]+ \- TD\: \+([0-9]+) \+ CvA\: [\+\-][0-9]+ \+ d100\: \+[0-9]+ == [\+\-][0-9]+/
+				td = $1.to_i
+				unless target_npc_id.nil?
+					if line = $_SERVERBUFFER_.reverse.find { |l| l =~ /<spell[^>]*>(?!None)/ }
+						spell_name = line.match(/<spell.*?>(.*?)<\/spell>/).captures.first
+						if spell_circle = Spell[spell_name].circle
+							unless info = npc_td.find { |foo| foo['id'] == target_npc_id }
+								info = { 'id' => target_npc_id }
+								npc_td.push(info)
+							end
+							td -= 75 if banshee_defence.include?(target_npc_id)
+							info[spell_circle.to_i] = td
+						end
+					end
+				end
+			elsif line =~ /^You hear a sound like a weeping child as a white glow separates itself from the <.*exist=['"](.*?)['"].*>(.+)'s<.*?> body/
+				npc_id = $1
+				if GameObj.npcs.find { |n| n.id == npc_id }.name == 'elder tree spirit'
+					npc_name = 'elder tree spirit'
+				else
+					npc_name = fix_name.call($2)
+				end
+				sleep 0.1
+				if $sexual_favors_debug
+					echo "npc_name: #{npc_name.inspect}"
+					echo "npc[npc_name][:lvl]: #{npc[npc_name][:lvl].inspect}"
+				end
+				if level = npc[npc_name][:lvl]
+					echo "level: #{level.inspect}" if $sexual_favors_debug
+					if level > 19
+						level_variation = [(level/10), 5].min
+						if spell_circle = spell_circle_list.find { |c| npc[npc_name][:td_mod][c] and npc_td.any? { |foo| (foo['id'] == npc_id) and foo[c] } }
+							echo "spell_circle: #{spell_circle}" if $sexual_favors_debug
+							offset = npc[npc_name][:td_mod][spell_circle]
+							echo "offset: #{offset}" if $sexual_favors_debug
+							td = npc_td.find { |foo| foo['id'] == npc_id }[spell_circle]
+							echo "td: #{td}" if $sexual_favors_debug
+							while (line = get)
+								if line =~ /exist=['"]#{npc_id}['"]/
+									for message,bonus in spell_bonus
+										if line =~ message
+											echo "td - #{bonus[spell_circle]} = #{td - bonus[spell_circle]}" if $sexual_favors_debug
+											td -= bonus[spell_circle]
+											break
+										end
+									end
+								else
+									script.downstream_buffer.unshift(line)
+									break
+								end
+							end
+							if ((td - offset) % 3 == 0) and (exact_level = (td - offset) / 3) and (exact_level <= (level + level_variation)) and (exact_level >= (level - level_variation))
+								favor_gain = (exact_level*XMLData.level/15.0).ceil
+								favor_range = " (level #{exact_level})"
+							else
+								favor_gain = (level*XMLData.level/15.0).ceil
+								favor_range = " (+/- #{[(favor_gain - ((level-level_variation)*XMLData.level/15.0).ceil), (((level+level_variation)*XMLData.level/15.0).ceil - favor_gain)].max})"
+							end
+						else
+							favor_gain = (level*XMLData.level/15.0).ceil
+							favor_range = " (+/- #{[(favor_gain - ((level-level_variation)*XMLData.level/15.0).ceil), (((level+level_variation)*XMLData.level/15.0).ceil - favor_gain)].max})"
+						end
+					else
+						favor_range = String.new
+						favor_gain = (level*XMLData.level/15.0).ceil
+					end
+					$favor[:symbol] += favor_gain
+					$favor[:step]   += favor_gain
+					output = "+ #{favor_gain}#{favor_range} = #{add_commas.call($favor[:symbol])}"
+					if Society.rank < 26
+						output.concat "   step favor: #{add_commas.call($favor[:step])}/#{add_commas.call(favor_to_step.call)}  (#{($favor[:step]*100)/favor_to_step.call}%)"
+					end
+					echo output
+					npc_td.delete_if { |foo| foo['id'] == npc_id }
+				else
+					echo "unknown level for #{npc_name}"
+				end
+			end
+		end
+	elsif line =~ /^You hear a sound like a weeping child as a white glow separates itself from the <.*exist=['"](.*?)['"].*>(.+)'s<.*?> body/
+		npc_id = $1
+		if GameObj.npcs.find { |n| n.id == npc_id }.name == 'elder tree spirit'
+			npc_name = 'elder tree spirit'
+		else
+			npc_name = fix_name.call($2)
+		end
+		sleep 0.1
+		if level = npc[npc_name][:lvl]
+			if level > 19
+				level_variation = [(level/10), 5].min
+				if spell_circle = spell_circle_list.find { |c| npc[npc_name][:td_mod][c] and npc_td.any? { |foo| (foo['id'] == npc_id) and foo[c] } }
+					echo "spell_circle: #{spell_circle}" if $sexual_favors_debug
+					offset = npc[npc_name][:td_mod][spell_circle]
+					td = npc_td.find { |foo| foo['id'] == npc_id }[spell_circle]
+					while (line = get)
+						if line =~ /exist=['"]#{npc_id}['"]/
+							for message,bonus in spell_bonus
+								if line =~ message
+									echo "td -= #{bonus[spell_circle]}" if $sexual_favors_debug
+									td -= bonus[spell_circle]
+									break
+								end
+							end
+						else
+							script.downstream_buffer.unshift(line)
+							break
+						end
+					end
+					if ((td - offset) % 3 == 0) and (exact_level = (td - offset) / 3) and (exact_level <= (level + level_variation)) and (exact_level >= (level - level_variation))
+						favor_gain = (([exact_level, XMLData.level].min*XMLData.level/15.0).ceil/3.0).ceil
+						favor_range = " (level #{exact_level})"
+					else
+						favor_gain = (([level, XMLData.level].min*XMLData.level/15.0).ceil/3.0).ceil
+						favor_range = " (+/- #{[ favor_gain - (([level-level_variation, XMLData.level].min*XMLData.level/15.0).ceil/3.0).ceil, (([level+level_variation, XMLData.level].min*XMLData.level/15.0).ceil/3.0).ceil - favor_gain ].max})"
+					end
+				else
+					favor_gain = (([level, XMLData.level].min*XMLData.level/15.0).ceil/3.0).ceil
+					favor_range = " (+/- #{[ favor_gain - (([level-level_variation, XMLData.level].min*XMLData.level/15.0).ceil/3.0).ceil, (([level+level_variation, XMLData.level].min*XMLData.level/15.0).ceil/3.0).ceil - favor_gain ].max})"
+				end
+			else
+				favor_range = String.new
+				favor_gain = (([level, XMLData.level].min*XMLData.level/15.0).ceil/3.0).ceil
+			end
+			$favor[:symbol] += favor_gain
+			$favor[:step]   += favor_gain
+			output = "+ #{favor_gain}#{favor_range} (spectator) = #{add_commas.call($favor[:symbol])}"
+			if Society.rank < 26
+				output.concat "   step favor: #{add_commas.call($favor[:step])}/#{add_commas.call(favor_to_step.call)}  (#{($favor[:step]*100)/favor_to_step.call}%)"
+			end
+			echo output
+		else
+			echo "unknown level for #{npc_name}"
+		end
+	elsif line =~ /^(?:<.*?>)?The (?:<.*?>)?monk(?:<.*?>)? concludes ceremoniously.*Go now and continue your work\./
+		$favor[:step] = 0
+		start_time = Time.now
+		start_step_favor = 0
+
+	#
+	# symbol of blessing
+	#
+	elsif line =~ /^A wave of power flows outward from you towards/
+		sleep 0.1
+		if next_line = get?
+#			if (next_line =~ /^A soft white glow surrounds|^A brilliant white light wraps around/) and (next_line !~ /gently dissipates|returns to its original color/)
+			if (next_line =~ /^A brilliant white light wraps around/) and (next_line !~ /returns to its original color/)
+				# fixme: find a more accurate way to tell if the weapon is magical
+				if line =~ /(?:carmiln|deringo|faewood|fireleaf|glowbark|hoarbeam|ilthorn|ipantor|kakore|lor|mesille|mossbark|orase|rowan|ruic|sephwir|villswood|witchwood|wyrwood|yew|coraesine|drakar|eahnor|eonake|faenor|glaes|mein|golvern|gornar|imflass|kelyn|krodera|mithglin|mithril|ora|razern|rhimar|rolaren|urglaes|urnon|vaalorn|veil iron|vultite|zorchar)[^\-]/
+				# if line =~ /^A wave of power flows outward from you towards an? (?:<.*?>)?[A-z\-]+ .+(?:<.*?>)?\.$/
+					subtract_favor.call(2)
+				else
+					subtract_favor.call(0.4)
+				end
+			end
+		end
+	#
+	# symbol of thought
+	#
+	elsif line =~ /^You concentrate on the Symbol of Thought/
+		sleep 0.1
+		unless get? =~ /^You strain/
+			if thought = $_CLIENTBUFFER_.reverse.find { |line| line =~ /^(?:\[.+?\]>)?(?:<c>)?sym(?:b|bo|bol)?\s+(?:of\s+)?th(?:o|ou|oug|ough|ought)?/ }
+				if thought =~ /^(?:\[.+?\]>)?(?:<c>)?sym(?:b|bo|bol)?\s+(?:of\s+)?th(?:o|ou|oug|ough|ought)?\s+(.*)/
+					message = $1
+					this_favor = [((message.length-1)/3.0).ceil, 83].min
+					$favor[:symbol] = ($favor[:symbol] - this_favor).to_i
+					echo "- #{this_favor} = #{add_commas.call($favor[:symbol])}"
+				end
+			end
+		end
+
+	elsif line =~ /^You draw a glowing pattern in the air before/
+		sleep 0.1
+		next_line = get?
+
+		#
+		# symbol of diminishment
+		#
+		if next_line =~ /^(?:<.*?>)?(?:The|A|An) .*? (?:appears diminished|is unaffected)!$/
+			subtract_favor.call(3)
+
+		#
+		# symbol of sleep
+		#
+		elsif next_line =~ /eyes roll up into|eyes glass over as a distant look takes over|is unaffected by your Symbol of Sleep/
+			subtract_favor.call(2)
+
+		#
+		# symbol of turning
+		#
+		elsif next_line =~ /lets out a blood curdling scream/
+			# fixme: more messages maybe
+			subtract_favor.call(3)
+
+		end
+
+	#
+	# symbol of courage
+	#
+	elsif line =~ /^You feel more courageous/
+		subtract_favor.call(1)
+
+	#
+	# protection
+	#
+	elsif line =~ /^You feel a layer of protection surround you/
+		subtract_favor.call(1)
+
+	#
+	# symbol of submission
+	#
+	elsif line =~ /^You feel the power of the symbol project toward/
+		subtract_favor.call(3)
+
+	#
+	# symbol of holiness
+	#
+	elsif line =~ /^A wave of power flows out of you and toward .+ bursts into flames/
+		subtract_favor.call(3)
+
+	#
+	# symbol of recall
+	#
+	elsif line =~ /^You focus on recalling magical assistance that will be of use when you rise again, and feel the power of Lorminstra suffusing your spirit\./
+		subtract_favor.call(4)
+
+	#
+	# symbol of transcendence
+	#
+	elsif line =~ /^You step into the space between the corporeal and ethereal realms\.|^With difficulty, you manage to will yourself into the space between the corporeal and ethereal realms\./
+		subtract_favor.call(6)
+
+	#
+	# symbol of mana
+	#
+	elsif line =~ /^(?:<.*?>)?You feel a surge of mana flow through you/
+		subtract_favor.call(3)
+
+	#
+	# symbol of sight
+	#
+	elsif line =~ /^You concentrate on establishing the link and suddenly you see/
+		subtract_favor.call(3)
+
+	#
+	# symbol of retribution (alive)
+	#
+	elsif line =~ /^You feel an aura of righteous wrath surround you\./
+		subtract_favor.call(3)
+
+	#
+	# symbol of retribution (dead)
+	#
+	elsif line =~ /^You sense deep within your soul, a rage that burns upward and out of your lips in a terrible scream of rage against the undead!/
+		subtract_favor.call(0.4)
+
+	#
+	# symbol of supremacy
+	#
+	elsif line =~ /^You feel infused with a collective knowledge on the undead and their weaknesses\./
+		subtract_favor.call(5)
+
+	#
+	# restoration
+	#
+	elsif line =~ /^(?:<.*?>)?You feel the power of the symbol course through your body/
+		subtract_favor.call(4)
+
+	#
+	# symbol of need
+	# 
+	elsif line =~ /^You concentrate on the Symbol of Need\./
+		subtract_favor.call(4)
+
+	# symbol of renewal
+	#
+	elsif line =~ /^(?:<.*?>)?You feel a surge of life flow through you\./ # fixme: test xml
+		subtract_favor.call(5) # fixme: test
+
+	#
+	# symbol of disruption
+	#
+	elsif line =~ /^A churning spectral aura surrounds you/
+		# fixme: extra cost for group members
+		subtract_favor.call(3) # fixme: test
+
+	#
+	# symbol of preservation
+	#
+	elsif line =~ /^You concentrate and sense the power of the Symbol of Preservation well up within you|^You send a wave of energy toward .*?\.  It coalesces around .*? body and then seeps in leaving a glow that strengthens the bond between body and spirit\./
+		subtract_favor.call(6)
+
+	#
+	# symbol of dreams
+	#
+	elsif line =~ /^(?:<.*?>)?You feel suddenly tired and lie down for a nap\./
+		subtract_favor.call(6) # fixme: test
+
+	#
+	# symbol of return
+	#
+	elsif line =~ /^Your surroundings blur into a white fog \. \. \./
+		if symbol = $_CLIENTBUFFER_[[-10,0-$_CLIENTBUFFER_.length].max..-1].reverse.find { |cmd| cmd =~ /^(?:\[.*?\]>)?(?:<c>)?(?:sy|sym|symb|symbo|symbol)\s+(?:of\s+)?(?:retu|see)/i }
+			unless symbol =~ /\(checked\)$/
+				symbol.concat ' (checked)'
+				if symbol =~ /^(?:\[.*?\]>)?(?:<c>)?(?:sy|sym|symb|symbo|symbol)\s+(?:of\s+)?retu/i
+					subtract_favor.call(10)
+				end
+			end
+		end
+
+	# fixme: need River's Rest messages
+	elsif line =~ /^After a few moments of prayer and reflection you see a vision of a flower that has not yet begun to open\./
+		echo '0-10%'
+		Script.log "level #{Char.level}, step: #{Society.rank}, step favor: #{$favor[:step]}, percent of favor needed to step: 0-10%"
+	elsif line =~ /^After a few moments of prayer and reflection you see a vision of a baby eagle barely hatched from its egg\./
+		echo '10-20%'
+		Script.log "level #{Char.level}, step: #{Society.rank}, step favor: #{$favor[:step]}, percent of favor needed to step: 10-20%"
+	elsif line =~ /^After a few moments of prayer and reflection you see a vision of a butterfly drying its wings on a leaf\./
+		echo '20-30%'
+		Script.log "level #{Char.level}, step: #{Society.rank}, step favor: #{$favor[:step]}, percent of favor needed to step: 20-30%"
+	elsif line =~ /^After a few moments of prayer and reflection you see a vision of the headwaters of a mighty river\.\s? Here it has joined with several other streams and is growing quickly\./
+		echo '30-40%'
+		Script.log "level #{Char.level}, step: #{Society.rank}, step favor: #{$favor[:step]}, percent of favor needed to step: 30-40%"
+	elsif line =~ /^After a few moments of prayer and reflection you see a vision of a weaver on a loom, nearly half way in the creation of an intricate tapestry\./
+		echo '40-50%'
+		Script.log "level #{Char.level}, step: #{Society.rank}, step favor: #{$favor[:step]}, percent of favor needed to step: 40-50%"
+	elsif line =~ /^After a few moments of prayer and reflection you see a brief vision of twin bowls of wine\.\s? You reach out and empty the contents of one into the other filling it up\.\s? You have a sudden desire to fill up the empty bowl too\./
+		echo '50-60%'
+		Script.log "level #{Char.level}, step: #{Society.rank}, step favor: #{$favor[:step]}, percent of favor needed to step: 50-60%"
+	elsif line =~ /^After a few moments of prayer and reflection you see a vision of a hiker as he clears the peak of a hill and begins to descend the other side\./
+		echo '60-70%'
+		Script.log "level #{Char.level}, step: #{Society.rank}, step favor: #{$favor[:step]}, percent of favor needed to step: 60-70%"
+	elsif line =~ /^After a few moments of prayer and reflection you see a vision of a lute, finely crafted, but missing a third of its strings\./
+		echo '70-80%'
+		Script.log "level #{Char.level}, step: #{Society.rank}, step favor: #{$favor[:step]}, percent of favor needed to step: 70-80%"
+	elsif line =~ /^After a few moments of prayer and reflection you see a vision of a rainbow forming as a thunder storm begins to abate\./
+		echo '80-90%'
+		Script.log "level #{Char.level}, step: #{Society.rank}, step favor: #{$favor[:step]}, percent of favor needed to step: 80-90%"
+	elsif line =~ /^After a few moments of prayer and reflection you see a vision of a path as it winds its way through a forest and to the edge of a clear pool\.\s? You have a sudden desire to jump in but cannot\./
+		echo '90-100%'
+		Script.log "level #{Char.level}, step: #{Society.rank}, step favor: #{$favor[:step]}, percent of favor needed to step: 90-100%"
+	elsif line =~ /^After a few moments of prayer and reflection you see a vision of a pool of clear water\.\s? You dive in and swim to the bottom where you find a gold coin engraved with the image of Voln\.\s? An overwhelming feeling makes you realize that you are indeed ready to take the next step along the Path to Enlightenment\./
+		echo '100%'
+		Script.log "level #{Char.level}, step: #{Society.rank}, step favor: #{$favor[:step]}, percent of favor needed to step: 100%"
+	elsif line =~ /^The (?:<.*?>)?globe(?:<.*?>)? feels cold beneath your touch\./
+		high = 999 - globe_offset.call
+		low = 0
+		echo "0 revolutions = 0 to #{high} favor#{' (+/- 16)' if guessed_globe}"
+		if globe_sets_favor
+			if $favor[:symbol] > high
+				diff = $favor[:symbol] - high
+				$favor[:symbol] = high
+				echo "symbol favor - #{diff} = #{add_commas.call($favor[:symbol])}"
+			elsif $favor[:symbol] < low
+				diff = low - $favor[:symbol]
+				$favor[:symbol] = low
+				echo "symbol favor + #{diff} = #{add_commas.call($favor[:symbol])}"
+			end
+		end
+	elsif line =~ /^The (?:<.*?>)?globe(?:<.*?>)? hums and turns slowly once under your fingers\./
+		high = 1999 - globe_offset.call
+		low = 1000 - globe_offset.call
+		echo "1 revolution = #{add_commas.call(low)} to #{add_commas.call(high)} favor#{' (+/- 16)' if guessed_globe}"
+		if globe_sets_favor
+			if $favor[:symbol] > high
+				diff = $favor[:symbol] - high
+				$favor[:symbol] = high
+				echo "symbol favor - #{diff} = #{add_commas.call($favor[:symbol])}"
+			elsif $favor[:symbol] < low
+				diff = low - $favor[:symbol]
+				$favor[:symbol] = low
+				echo "symbol favor + #{diff} = #{add_commas.call($favor[:symbol])}"
+			end
+		end
+	elsif line =~ /^You try to count the number of spins and (?:are certain it was|figure it was around|figure it was at least) ([0-9]+) revolutions\./
+		count = $1.to_i
+		if count < 10
+			high = (count*1000) + 999 - globe_offset.call
+			low = (count*1000) - globe_offset.call
+		elsif count < 100
+			high = (count*1000) + 9999 - globe_offset.call
+			low = (count*1000) - globe_offset.call
+		else
+			high = (count*1000) + 49999 - globe_offset.call
+			low = (count*1000) - globe_offset.call
+		end
+		echo "#{count} revolutions = #{add_commas.call(low)} to #{add_commas.call(high)} favor#{' (+/- 16)' if guessed_globe}"
+		if globe_sets_favor
+			if $favor[:symbol] > high
+				diff = $favor[:symbol] - high
+				$favor[:symbol] = high
+				echo "symbol favor - #{diff} = #{add_commas.call($favor[:symbol])}"
+			elsif $favor[:symbol] < low
+				diff = low - $favor[:symbol]
+				$favor[:symbol] = low
+				echo "symbol favor + #{diff} = #{add_commas.call($favor[:symbol])}"
+			end
+		end
+	end
+end
+
+=begin
+
+	- favor to step -
+
+	- level 3 -
+	rank  1: 115
+	rank  2: 215
+	rank  3: 315
+	rank  4: 430
+	rank  5: 530
+	rank  6: 630
+	rank  7: 745
+	rank  8: 845
+	rank  9: 945
+	rank 10: 1060
+	rank 11: 1160
+	rank 12: 1260
+	rank 13: 1375
+	rank 14: 1475
+	rank 15: 1575
+	rank 16: 1690
+	rank 17: 1790
+	rank 18: 1890
+	rank 19: 2005
+	rank 20: 2105
+	rank 21: 2205
+	rank 22: 2320
+	rank 23: 2420
+	rank 24: 2520
+	rank 25: 2635
+
+
+
+	- level 77 -
+	
+	step  2:   8,237 -   9,268
+	step  4:  19,060 -  21,443
+	step  5:       0 -  30,285
+	step  6:       0 -  31,412
+	step  7:  30,100 -  33,099
+	step  8:  30,154 -  33,237
+	
+	- level 78 -
+	
+	step  2:       0 -  12,290
+	step  6:       0 -  31,426
+	step  7:  30,731 -  31,300
+	step  8:  29,983 -  31,359
+	
+	- level 100 -
+	
+	step 17: 101,615 - 103,877
+	step 18: 101,956 - 110,905
+	step 19: 118,054 - 120,246
+	step 20: 117,190 - 118,835
+	step 21: 118,046 - 119,890
+	step 22: 133,376 - 136,375
+	step 23: 134,386 - 137,352
+	step 24: 135,500 - 137,673
+
+
+
+=end
+
+=begin
+
+	- level 100 globe -
+
+	    favor		message
+	    -----		-------
+	     0-   978	The globe feels cold beneath your touch.
+	   979-  1978	The globe hums and turns slowly once under your fingers.
+	  1979-  2978	You try to count the number of spins and are certain it was 2 revolutions.
+	  2979-  3978	You try to count the number of spins and are certain it was 3 revolutions.
+	  3979-  4978	You try to count the number of spins and are certain it was 4 revolutions.
+	  4979-  5978	You try to count the number of spins and are certain it was 5 revolutions.
+	  5979-  6978	You try to count the number of spins and are certain it was 6 revolutions.
+	  6979-  7978	You try to count the number of spins and are certain it was 7 revolutions.
+	  7979-  8978	You try to count the number of spins and are certain it was 8 revolutions.
+	  8979-  9978	You try to count the number of spins and are certain it was 9 revolutions.
+	  9979- 19978	You try to count the number of spins and figure it was around 10 revolutions.
+	 19979- 29978	You try to count the number of spins and figure it was around 20 revolutions.
+	 29979- 39978	You try to count the number of spins and figure it was around 30 revolutions.
+	 39979- 49978	You try to count the number of spins and figure it was around 40 revolutions.
+	 49979-      	You try to count the number of spins and figure it was around 50 revolutions.
+
+	      -392316	You try to count the number of spins and figure it was at least 350 revolutions.
+
+
+	- level 3-10 globe -
+
+	    favor		message
+	    -----		-------
+	     0-   999	The globe feels cold beneath your touch.
+	  1000-  1999	The globe hums and turns slowly once under your fingers.
+	  2000-      	You try to count the number of spins and are certain it was 2 revolutions.
+
+	- level 11-15 globe -
+
+	    favor		message
+	    -----		-------
+	     0-   998	The globe feels cold beneath your touch.
+	   999-  1998	The globe hums and turns slowly once under your fingers.
+	  1999-      	You try to count the number of spins and are certain it was 2 revolutions.
+
+	- level 16-20 globe -
+
+	    favor		message
+	    -----		-------
+	     0-   997	The globe feels cold beneath your touch.
+	   998-  1997	The globe hums and turns slowly once under your fingers.
+	  1998-      	You try to count the number of spins and are certain it was 2 revolutions.
+
+	- level 21-25 globe -
+
+	    favor		message
+	    -----		-------
+	     0-   996	The globe feels cold beneath your touch.
+	   997-  1996	The globe hums and turns slowly once under your fingers.
+	  1997-      	You try to count the number of spins and are certain it was 2 revolutions.
+
+	- level 26-30 globe -
+
+	    favor		message
+	    -----		-------
+	     0-   995	The globe feels cold beneath your touch.
+	   996-  1995	The globe hums and turns slowly once under your fingers.
+	  1996-      	You try to count the number of spins and are certain it was 2 revolutions.
+
+	- level 31-34 globe -
+
+	    favor		message
+	    -----		-------
+	     0-   994	The globe feels cold beneath your touch.
+	   995-  1994	The globe hums and turns slowly once under your fingers.
+	  1995-      	You try to count the number of spins and are certain it was 2 revolutions.
+
+	- level 35-38 globe -
+
+	    favor		message
+	    -----		-------
+	     0-   993	The globe feels cold beneath your touch.
+	   994-  1993	The globe hums and turns slowly once under your fingers.
+	  1994-      	You try to count the number of spins and are certain it was 2 revolutions.
+
+=end
+
+=begin
+
+	- level 3 -
+
+	level  1- 5 kill = 1 favor
+	level  6-10 kill = 2 favor
+	level 13-15 kill = 3 favor
+	level 16-20 kill = 4 favor
+	level    23 kill = 5 favor
+
+	level  1-41 spectator = 1 favor
+
+	sym bless   =  1 favor
+	sym courage =  2 favor
+	sym sleep   =  3 favor
+	sym dimin   =  4 favor
+	sym need    =  5 favor
+	sym suprem  =  7 favor
+	sym transen =  8 favor
+	sym return  = 13 favor
+
+	- level 4 -
+
+	level  1- 3 kill = 1 favor
+	level  4- 6 kill = 2 favor
+	level  8-10 kill = 3 favor
+	level 13-15 kill = 4 favor
+	level    16 kill = 5 favor
+	level    20 kill = 6 favor
+
+	level  1-20 spectator = 1 favor
+
+	sym bless   =  1 favor
+	sym courage =  3 favor
+	sym sleep   =  5 favor
+	sym dimin   =  7 favor
+	sym need    =  9 favor
+	sym suprem  = 11 favor
+	sym transen = 13 favor
+	sym return  = 22 favor
+
+	- level 5 -
+
+	sym bless   =  2 favor
+	sym courage =  4 favor
+	sym sleep   =  7 favor
+	sym dimin   = 10 favor
+	sym need    = 13 favor
+	sym suprem  = 16 favor
+	sym transen = 19 favor
+	sym return  = 32 favor
+
+	level  1- 3 kill = 1 favor
+	level 6 kill = 2 favor
+	level 9 kill = 3 favor
+	level 15 kill = 5 favor
+	level 16 kill = 6 favor
+
+	level 16 spectator = 1 favor
+
+	- level 6 -
+
+	level  3 kill =  2 favor
+	level  6 kill =  3 favor
+	level 16 kill =  7 favor
+	level 20 kill =  8 favor
+	level 24 kill = 10 favor
+
+	level 1-2 spectator = 1 favor
+
+	sym bless   =  2 favor
+	sym courage =  5 favor
+	sym sleep   =  9 favor
+	sym dimin   = 13 favor
+	sym need    = 18 favor
+	sym suprem  = 22 favor
+	sym transen = 26 favor
+	sym return  = 43 favor
+
+	- level 7 -
+
+	checked kill: 3, 9, 16, 20, 24
+	checked spectator: 9, 16, 20
+
+	sym bless   =  3 favor
+	sym courage =  6 favor
+	sym sleep   = 12 favor
+	sym dimin   = 17 favor
+	sym need    = 23 favor
+	sym suprem  = 28 favor
+	sym transen = 34 favor
+	sym return  = 56 favor
+
+	- level 8 -
+
+	checked kill: 1, 2, 6, 16, 24
+	checked spectator: 1, 2, 6, 16, 24
+
+	sym bless   =  3 favor
+	sym courage =  7 favor
+	sym sleep   = 14 favor
+	sym dimin   = 21 favor
+	sym need    = 28 favor
+	sym suprem  = 35 favor
+	sym transen = 42 favor
+	sym return  = 70 favor
+
+	- level 9 -
+
+	checked kill: 1, 2
+
+	sym bless   =  4 favor
+	sym courage =  9 favor
+	sym sleep   = 17 favor
+	sym dimin   = 26 favor
+	sym need    = 34 favor
+	sym suprem  = 43 favor
+	sym transen = 51 favor
+	sym return  = 85 favor
+
+
+	- level 10 -
+
+	checked kill: 1, 2
+
+	sym bless   =   4 favor
+	sym courage =  10 favor
+	sym sleep   =  20 favor
+	sym dimin   =  30 favor
+	sym need    =  40 favor
+	sym suprem  =  50 favor
+	sym transen =  60 favor
+	sym return  = 100 favor
+
+	- level 11 -
+
+	checked kill: 1, 2, 6
+
+	sym bless   =   5 favor
+	sym courage =  12 favor
+	sym sleep   =  24 favor
+	sym dimin   =  35 favor
+	sym need    =  47 favor
+	sym suprem  =  59 favor
+	sym transen =  70 favor
+	sym return  = 117 favor
+
+	- level 12 -
+
+	checked kill: 1, 2, 6
+
+	sym bless   =   6 favor
+	sym courage =  14 favor
+	sym sleep   =  27 favor
+	sym dimin   =  40 favor
+	sym need    =  54 favor
+	sym suprem  =  67 favor
+	sym transen =  80 favor
+	sym return  = 134 favor
+
+	- level 13 -
+
+	checked kill: 1, 2, 3, 6, 9
+
+	sym bless   =   7 favor
+	sym courage =  16 favor
+	sym sleep   =  31 favor
+	sym dimin   =  46 favor
+	sym need    =  61 favor
+	sym suprem  =  76 favor
+	sym transen =  91 favor
+	sym return  = 151 favor
+
+	- level 14 -
+
+	checked kill: 1, 2, 3, 9
+	checked spectator: 1, 2
+
+	sym bless   =   7 favor
+	sym courage =  17 favor
+	sym sleep   =  34 favor
+	sym dimin   =  51 favor
+	sym need    =  68 favor
+	sym suprem  =  85 favor
+	sym transen = 102 favor
+	sym return  = 169 favor
+
+	- level 15 -
+
+	checked kill: 1, 2, 15
+	checked spectator: 1, 2
+
+	sym bless   =   8 favor
+	sym courage =  19 favor
+	sym sleep   =  38 favor
+	sym dimin   =  57 favor
+	sym need    =  75 favor
+	sym suprem  =  94 favor
+	sym transen = 113 favor
+	sym return  = 188 favor
+
+
+	- level 16 -
+
+	checked kill: 1, 2
+	checked spectator:
+
+	sym bless   =   9 favor
+	sym courage =  21 favor
+	sym sleep   =  42 favor
+	sym dimin   =  62 favor
+	sym need    =  83 favor
+	sym suprem  = 104 favor
+	sym transen = 124 favor
+	sym return  = 207 favor
+
+	- level 17 -
+
+	checked kill: 1, 2, 15
+	checked spectator:
+
+	sym bless   =  10 favor
+	sym courage =  23 favor
+	sym sleep   =  46 favor
+	sym dimin   =  68 favor
+	sym need    =  91 favor
+	sym suprem  = 113 favor
+	sym transen = 136 favor
+	sym return  = 226 favor
+
+	- level 18 -
+
+	checked kill: 1, 2, 15
+	checked spectator:
+
+	sym bless   =  10 favor
+	sym courage =  25 favor
+	sym sleep   =  50 favor
+	sym dimin   =  74 favor
+	sym need    =  99 favor
+	sym suprem  = 123 favor
+	sym transen = 148 favor
+	sym return  = 246 favor
+
+	- level 19 -
+
+	checked kill: 1, 2, 15
+	checked spectator:
+
+	sym bless   =  11 favor
+	sym courage =  27 favor
+	sym sleep   =  54 favor
+	sym dimin   =  80 favor
+	sym need    = 107 favor
+	sym suprem  = 133 favor
+	sym transen = 160 favor
+	sym return  = 266 favor
+
+	- level 20 -
+
+	checked kill: 1, 2, 15
+	checked spectator:
+
+	sym bless   =  12 favor
+	sym courage =  29 favor
+	sym sleep   =  58 favor
+	sym dimin   =  86 favor
+	sym need    = 115 favor
+	sym suprem  = 143 favor
+	sym transen = 172 favor
+	sym return  = 286 favor
+
+	- level 21 -
+
+	checked kill: 1, 15
+	checked spectator:
+
+	sym bless   =  13 favor
+	sym courage =  31 favor
+	sym sleep   =  62 favor
+	sym dimin   =  92 favor
+	sym need    = 123 favor
+	sym suprem  = 154 favor
+	sym transen = 184 favor
+	sym return  = 307 favor
+
+	- level 22 -
+
+	checked kill: 15
+	checked spectator:
+
+	sym bless   =  14 favor
+	sym courage =  33 favor
+	sym sleep   =  66 favor
+	sym dimin   =  99 favor
+	sym need    = 131 favor
+	sym suprem  = 164 favor
+	sym transen = 197 favor
+	sym return  = 328 favor
+
+	- level 23 -
+
+	checked kill: 15, 23
+	checked spectator:
+
+	sym bless   =  14 favor
+	sym courage =  35 favor
+	sym sleep   =  70 favor
+	sym dimin   = 105 favor
+	sym need    = 140 favor
+	sym suprem  = 175 favor
+	sym transen = 209 favor
+	sym return  = 349 favor
+
+	- level 24 -
+
+	checked kill: 15
+	checked spectator:
+
+	sym bless   =  15 favor
+	sym courage =  37 favor
+	sym sleep   =  74 favor
+	sym dimin   = 111 favor
+	sym need    = 148 favor
+	sym suprem  = 185 favor
+	sym transen = 222 favor
+	sym return  = 370 favor
+
+	- level 25 -
+
+	checked kill: 15
+	checked spectator:
+
+	sym bless   =  16 favor
+	sym courage =  40 favor
+	sym sleep   =  79 favor
+	sym dimin   = 118 favor
+	sym need    = 157 favor
+	sym suprem  = 196 favor
+	sym transen = 235 favor
+	sym return  = 391 favor
+
+	- level 26 -
+
+	checked kill: 
+	checked spectator:
+
+	sym bless   =  17 favor
+	sym courage =  42 favor
+	sym sleep   =  83 favor
+	sym dimin   = 124 favor
+	sym need    = 165 favor
+	sym suprem  = 207 favor
+	sym transen = 248 favor
+	sym return  = 413 favor
+
+	- level 27 -
+
+	sym bless   =  18 favor
+	sym courage =  44 favor
+	sym sleep   =  87 favor
+	sym dimin   = 131 favor
+	sym need    = 174 favor
+	sym suprem  = 217 favor
+	sym transen = 261 favor
+	sym return  = 434 favor
+
+	- level 28 -
+
+	sym bless   =  19 favor
+	sym courage =  46 favor
+	sym sleep   =  92 favor
+	sym dimin   = 137 favor
+	sym need    = 183 favor
+	sym suprem  = 228 favor
+	sym transen = 274 favor
+	sym return  = 456 favor
+
+	- level 29 -
+
+	sym bless   =  20 favor
+	sym courage =  48 favor
+	sym sleep   =  96 favor
+	sym dimin   = 144 favor
+	sym need    = 192 favor
+	sym suprem  = 239 favor
+	sym transen = 287 favor
+	sym return  = 478 favor
+
+	- level 30 -
+
+	sym bless   =  20 favor
+	sym courage =  50 favor
+	sym sleep   = 100 favor
+	sym dimin   = 150 favor
+	sym need    = 200 favor
+	sym suprem  = 250 favor
+	sym transen = 300 favor
+	sym return  = 500 favor
+
+	- level 31 -
+
+	level 15 kill: 31 favor
+	(undead_level * (XMLData.level / 15.0)).ceil = wrong
+	(undead_level * XMLData.level / 15.0).ceil = right
+
+	sym bless   =  21 favor
+	sym courage =  53 favor
+	sym sleep   = 105 favor
+	sym dimin   = 157 favor
+	sym need    = 209 favor
+	sym suprem  = 262 favor
+	sym transen = 314 favor
+	sym return  = 523 favor
+
+	- level 32 -
+
+	sym bless   =  22 favor
+	sym courage =  55 favor
+	sym sleep   = 109 favor
+	sym dimin   = 164 favor
+	sym need    = 218 favor
+	sym suprem  = 273 favor
+	sym transen = 327 favor
+	sym return  = 545 favor
+
+	- level 33 -
+
+	sym bless   =  23 favor
+	sym courage =  57 favor
+	sym sleep   = 114 favor
+	sym dimin   = 171 favor
+	sym need    = 227 favor
+	sym suprem  = 284 favor
+	sym transen = 341 favor
+	sym return  = 568 favor
+
+	- level 34 -
+
+	sym bless   =  24 favor
+	sym courage =  59 favor
+	sym sleep   = 118 favor
+	sym dimin   = 177 favor
+	sym need    = 236 favor
+	sym suprem  = 295 favor
+	sym transen = 354 favor
+	sym return  = 590 favor
+
+	- level 35 -
+
+	sym bless   =  25 favor
+	sym courage =  62 favor
+	sym sleep   = 123 favor
+	sym dimin   = 184 favor
+	sym need    = 245 favor
+	sym suprem  = 307 favor
+	sym transen = 368 favor
+	sym return  = 613 favor
+
+	- level 36 -
+
+	sym bless   =  26 favor
+	sym courage =  64 favor
+	sym sleep   = 128 favor
+	sym dimin   = 191 favor
+	sym need    = 255 favor
+	sym suprem  = 318 favor
+	sym transen = 382 favor
+	sym return  = 636 favor
+
+	- level 37 -
+
+	sym bless   =  27 favor
+	sym courage =  66 favor
+	sym sleep   = 132 favor
+	sym dimin   = 198 favor
+	sym need    = 264 favor
+	sym suprem  = 330 favor
+	sym transen = 395 favor
+	sym return  = 659 favor
+
+	- level 38 -
+
+	sym bless   =  28 favor
+	sym courage =  69 favor
+	sym sleep   = 137 favor
+	sym dimin   = 205 favor
+	sym need    = 273 favor
+	sym suprem  = 341 favor
+	sym transen = 409 favor
+	sym return  = 682 favor
+
+=end
+
+
+=begin
+	# stupid fame only works some of the time for various reasons
+check_fame = proc {
+	fame = nil
+	started = false
+	hook_proc = proc { |server_string|
+		if started
+			if server_string =~ /^\s*Mental TPs: [0-9]+\s+Fame\: ([0-9]+)/
+				fame = $1.to_i
+				nil
+			elsif server_string =~ /<prompt/
+				DownstreamHook.remove('check-fame')
+				nil
+			elsif server_string =~ /<output/
+				server_string
+			end
+		else
+			if server_string =~ /^\s*Level\: [0-9]+\s+Deeds\: \-?[0-9]+/
+				started = true
+				nil
+			else
+				server_string
+			end
+		end
+	}
+	DownstreamHook.add('check-fame', hook_proc)
+	silence_me unless undo_silence = silence_me
+	put 'experience'
+	silence_me if undo_silence
+	wait_until { fame }
+	fame
+}
+
+last_fame = nil
+get_fame_change = proc {
+	if last_fame.nil?
+		last_fame = check_fame.call
+		0
+	else
+		new_fame = check_fame.call
+		change = new_fame - last_fame
+		last_fame = new_fame
+		change
+	end
+}
+
+level_factor = [ nil, nil, nil, 37, 65, 95, 129, 167, 209, 253, 300, 350, 400, 453, 506, 562, 619, 676, 736, 796, 856, 919, 982, 1045, 1109, 1173, 1237, 1302, 1367, 1433, 1500, 1567, 1634, 1694, 1760, 1826, 1893, 1960, 2027, 2094, 2162, 2230, 2298, 2366, 2435, 2505, 2575, 2645, 2715, 2785, 2856, 2927, 2998, 3069, 3140, 3212, 3284, 3356, 3428, 3500, 3572, 3644, 3716, 3789, 3862, 3935, 4008, 4081, 4154, 4227, 4301, 4375, 4449, 4523, 4597, 4671, 4745, 4819, 4893, 4967, 5041, 5115, 5189, 5263, 5337, 5411, 5485, 5559, 5633, 5707, 5781, 5855, 5929, 6003, 6077, 6151, 6225, 6299, 6373, 6447, 6521 ]
+cost = (level_factor[XMLData.level] / 30.0 * symbol_factor).ceil
+
+=end

@@ -1,0 +1,836 @@
+=begin
+
+	This script waits for you to kill something, and then it skins (optional),
+	searches, and picks up loot.
+
+	;loot help
+
+	tillmen@lichproject.org
+
+	# Author: Tillmen
+	# Category: loot
+
+=end
+
+if defined?(GameObj.type_data)
+	GameObj.load_data if GameObj.type_data.empty? or GameObj.type_data.nil?
+	if GameObj.type_data.nil?
+		wait_while { running?('updater') }
+		wait_while { running?('repository') }
+		start_script 'repository', [ 'download', 'gameobj-data.xml' ]
+		wait_while { running?('repository') }
+		wait_while { running?('updater') }
+		start_script 'updater', [ 'add', 'gameobj-data.xml' ]
+		wait_while { running?('updater') }
+		GameObj.load_data
+		exit if GameObj.type_data.nil?
+	end
+end
+
+char_settings = CharSettings.to_hash
+
+Settings['unskinnable']         = Array.new if Settings['unskinnable'].nil?
+Settings['blunt-skinnable']     = Array.new if Settings['blunt-skinnable'].nil?
+Settings['free-hand-skinnable'] = Array.new if Settings['free-hand-skinnable'].nil?
+CharSettings['skin']            = true      if CharSettings['skin'].nil?
+CharSettings['604']             = false     if CharSettings['604'].nil?
+CharSettings['safe-kneel']      = false     if CharSettings['safe-kneel'].nil?
+CharSettings['kneel']           = false     if CharSettings['kneel'].nil?
+CharSettings['stance']          = false     if CharSettings['stance'].nil?
+CharSettings['empty']           = false     if CharSettings['empty'].nil?
+CharSettings['never-empty']     = false     if CharSettings['never-empty'].nil?
+CharSettings['phase-boxes']     = false     if CharSettings['phase-boxes'].nil?
+CharSettings['get-arrows']      = false     if CharSettings['get-arrows'].nil?
+CharSettings['eblade-arrows']   = false     if CharSettings['eblade-arrows'].nil?
+
+CharSettings['loot-types'] = 'gem|reagent|herb|jewelry|magic|scroll|wand|uncommon|box' if CharSettings['loot-types'].nil?
+
+unless $new_loot.class == LimitedArray
+	$new_loot = LimitedArray.new
+	$new_loot.max_size = 250
+end
+
+show_settings = proc {
+	fix_setting = { true => 'on', false => 'off' }
+	output = String.new
+	output.concat "skin:          #{fix_setting[char_settings['skin']]}\n"
+	output.concat "604:           #{fix_setting[char_settings['604']]}\n"
+	output.concat "kneel:         #{fix_setting[char_settings['kneel']]}\n"
+	output.concat "safe-kneel:    #{fix_setting[char_settings['safe-kneel']]}\n"
+	output.concat "stance:        #{fix_setting[char_settings['stance']]}\n"
+	output.concat "empty:         #{fix_setting[char_settings['empty']]}\n"
+	output.concat "never-empty:   #{fix_setting[char_settings['never-empty']]}\n"
+	output.concat "phase-boxes:   #{fix_setting[char_settings['phase-boxes']]}\n"
+	output.concat "get-arrows:    #{fix_setting[char_settings['get-arrows']]}\n"
+	output.concat "eblade-arrows: #{fix_setting[char_settings['eblade-arrows']]}\n"
+	output.concat "exclude:       #{char_settings['exclude']}\n"
+	output.concat "loot-types:    #{char_settings['loot-types']}\n"
+	output.concat "\n"
+	output.concat "lootsack:            #{UserVars.lootsack}\n"
+	lootsack_num = 2
+	while (UserVars.send("lootsack#{lootsack_num}").class == String) and not UserVars.send("lootsack#{lootsack_num}").empty?
+		output.concat "lootsack#{lootsack_num}:           #{UserVars.send("lootsack#{lootsack_num}")}\n"
+		lootsack_num += 1
+	end
+	output.concat "skinweapon:          #{UserVars.skinweapon}\n"
+	output.concat "skinweaponsack:      #{UserVars.skinweaponsack}\n"
+	output.concat "bluntskinweapon:     #{UserVars.bluntskinweapon}\n"
+	output.concat "bluntskinweaponsack: #{UserVars.bluntskinweaponsack}\n"
+	output.concat "arrowsack:           #{UserVars.arrowsack}\n"
+	respond output
+}
+
+show_help = proc {
+	output = "\n"
+	output.concat "#{$lich_char}#{script.name}                          waits for you to kill someting and loots it\n"
+	output.concat "#{$lich_char}#{script.name} skin=<on/off>            skins before looting\n"
+	output.concat "#{$lich_char}#{script.name} 604=<on/off>             cast 604 before skinning\n"
+	output.concat "#{$lich_char}#{script.name} kneel=<on/off>           always kneels to skin\n"
+	output.concat "#{$lich_char}#{script.name} safe-kneel=<on/off>      kneels to skin if no live npcs are in the room\n"
+	output.concat "#{$lich_char}#{script.name} stance=<on/off>          changes to offensive stance to skin\n"
+	output.concat "#{$lich_char}#{script.name} empty=<on/off>           empty left hand when skinning\n"
+	output.concat "#{$lich_char}#{script.name} never-empty=<on/off>     empty hand preference is ignored for critters that\n"
+	output.concat "#{''.ljust($lich_char.length + script.name.length, ' ')}                          cannot be skinned without an empty hand; use this\n"
+	output.concat "#{''.ljust($lich_char.length + script.name.length, ' ')}                          setting to skip those critters\n"
+	output.concat "#{$lich_char}#{script.name} phase-boxes=<on/off>     make boxes lighter\n"
+	output.concat "#{$lich_char}#{script.name} get-arrows=<on/off>      pick up the arrows you fire and put them in your\n"
+	output.concat "#{''.rjust($lich_char.length)}#{''.rjust(script.name.length)}                          arrowsack (or lootsack if arrowsack isn't set)\n"
+	output.concat "#{$lich_char}#{script.name} eblade-arrows=<on/off>   eblade arrows when they fail to bundle\n"
+	output.concat "#{$lich_char}#{script.name} exclude=<regex>          regex of items not to pick up\n"
+	output.concat "#{$lich_char}#{script.name} exclude=nil              clear exclude setting\n"
+	output.concat "#{$lich_char}#{script.name} loot-types=<regex>       regex of the types of items to pick up\n"
+	output.concat "#{$lich_char}#{script.name} loot-types=nil           reset loot types to the default\n"
+	output.concat "\n"
+	output.concat "#{$lich_char}set change lootsack <container>\n"
+	output.concat "#{$lich_char}set change lootsack2 <container>\n"
+	output.concat "#{$lich_char}set change lootsack<num> <container>\n"
+	output.concat "#{$lich_char}set change skinweapon <weapon>\n"
+	output.concat "#{$lich_char}set change skinweaponsack <container>\n"
+	output.concat "#{$lich_char}set change bluntskinweapon <weapon>\n"
+	output.concat "#{$lich_char}set change bluntskinweaponsack <container>\n"
+	output.concat "#{$lich_char}set change arrowsack <container>\n"
+	output.concat "\n"
+	respond output
+}
+
+if script.vars.empty?
+	nil
+elsif script.vars[0].downcase == 'list'
+	show_settings.call
+	exit
+elsif script.vars[0] =~ /^(skin|604|kneel|safe\-kneel|stance|empty|never\-empty|phase\-boxes|get\-arrows|eblade\-arrows)=(on|off|yes|no|true|false)$/i
+	fix_setting = { 'on' => true, 'yes' => true, 'true' => true, 'off' => false, 'no' => false, 'false' => false }
+	CharSettings[$1.downcase] = fix_setting[$2.downcase]
+	echo 'setting saved'
+	exit
+elsif script.vars[0] =~ /^exclude=(.*)$/i
+	if $1 == 'nil'
+		CharSettings['exclude'] = nil
+		echo 'setting cleared'
+	else
+		CharSettings['exclude'] = $1
+		echo 'setting saved'
+	end
+	exit
+elsif script.vars[0] =~ /^loot\-?types=(.*)$/i
+	if $1 == 'nil'
+		CharSettings['loot-types'] = 'gem|reagent|herb|jewelry|magic|scroll|wand|uncommon|box'
+		echo 'setting reset'
+	else
+		CharSettings['loot-types'] = $1
+		echo 'setting saved'
+	end
+	exit
+else
+	show_help.call
+	exit
+end
+
+status_tags
+silence_me
+
+lootsack_list = Array.new
+lootsack_num = nil
+
+while (UserVars.send("lootsack#{lootsack_num}").class == String) and not UserVars.send("lootsack#{lootsack_num}").empty?
+	if lootsack = GameObj.inv.find { |obj| obj.name =~ /\b#{Regexp.escape(UserVars.send("lootsack#{lootsack_num}").strip)}$/i } || GameObj.inv.find { |obj| obj.name =~ /\b#{Regexp.escape(UserVars.send("lootsack#{lootsack_num}")).sub(' ', ' .*')}$/i } || GameObj.inv.find { |obj| obj.name =~ /\b#{Regexp.escape(UserVars.send("lootsack#{lootsack_num}")).sub(' ', ' .*')}/i }
+		lootsack_list.push(lootsack)
+	else
+		echo "warning: failed to find lootsack#{lootsack_num} (#{UserVars.send("lootsack#{lootsack_num}")})"
+	end
+	lootsack_num = 1 if lootsack_num.nil?
+	lootsack_num += 1
+end
+
+if lootsack_list.empty?
+	echo 'error: no lootsacks found' 
+	exit
+end
+
+if CharSettings['skin']
+	if (UserVars.skinweaponsack.nil? or UserVars.skinweaponsack.empty?)
+		echo 'error: skinning is enabled, but skinweaponsack is not set.  (;set change skinweaponsack <container name>)'
+		exit
+	end
+	unless skinweaponsack = GameObj.inv.find { |obj| obj.name =~ /\b#{Regexp.escape(UserVars.skinweaponsack.strip)}$/i } || GameObj.inv.find { |obj| obj.name =~ /\b#{Regexp.escape(UserVars.skinweaponsack).sub(' ', ' .*')}$/i } || GameObj.inv.find { |obj| obj.name =~ /\b#{Regexp.escape(UserVars.skinweaponsack).sub(' ', ' .*')}/i }
+		dothistimeout "pull my #{UserVars.skinweaponsack}", 3, /^You pull|^You reach|^I'm afraid|^What were you referring to/
+		dothistimeout "inventory", 3, /^You are wearing/
+		if skinweaponsack = GameObj.inv.find { |obj| obj.name =~ /\b#{Regexp.escape(UserVars.skinweaponsack.strip)}$/i } || GameObj.inv.find { |obj| obj.name =~ /\b#{Regexp.escape(UserVars.skinweaponsack).sub(' ', ' .*')}$/i } || GameObj.inv.find { |obj| obj.name =~ /\b#{Regexp.escape(UserVars.skinweaponsack).sub(' ', ' .*')}/i }
+			dothistimeout "push ##{skinweaponsack.id}", 3, /^You push|^You reach/
+		else
+			echo 'error: failed to find your skinweaponsack'
+			exit
+		end
+	end
+	if skinweaponsack.contents.nil?
+		dothistimeout "look in ##{skinweaponsack.id}", 3, /^In the/
+	end
+	if(UserVars.skinweapon.nil? or UserVars.skinweapon.empty?)
+		echo 'error: skinning is enabled, but skinweapon is not set.  (;set change skinweapon <weapon name>)'
+		exit
+	end
+	unless skinweapon = (skinweaponsack.contents | [ GameObj.right_hand, GameObj.left_hand ] | GameObj.containers.values.flatten).find { |obj| obj.name =~ /\b#{Regexp.escape(UserVars.skinweapon.strip)}$/i } || ([ GameObj.right_hand, GameObj.left_hand ] | GameObj.containers.values.flatten).find { |obj| obj.name =~ /\b#{Regexp.escape(UserVars.skinweapon).sub(' ', ' .*')}$/i } || (skinweaponsack.contents | [ GameObj.right_hand, GameObj.left_hand ] | GameObj.containers.values.flatten).find { |obj| obj.name =~ /\b#{Regexp.escape(UserVars.skinweapon).sub(' ', ' .*')}/i }
+		echo 'error: failed to find your skinweapon'
+		exit
+	end
+	if UserVars.bluntskinweaponsack and UserVars.bluntskinweapon
+		if bluntskinweaponsack = GameObj.inv.find { |obj| obj.name =~ /\b#{Regexp.escape(UserVars.bluntskinweaponsack.strip)}$/i } || GameObj.inv.find { |obj| obj.name =~ /\b#{Regexp.escape(UserVars.bluntskinweaponsack).sub(' ', ' .*')}$/i } || GameObj.inv.find { |obj| obj.name =~ /\b#{Regexp.escape(UserVars.bluntskinweaponsack).sub(' ', ' .*')}/i }
+			if bluntskinweaponsack.contents.nil?
+				dothistimeout "look in ##{bluntskinweaponsack.id}", 3, /^In the/
+			end
+			unless bluntskinweapon = ([ GameObj.right_hand, GameObj.left_hand ] | GameObj.containers.values.flatten).find { |obj| obj.name =~ /\b#{Regexp.escape(UserVars.bluntskinweapon.strip)}$/i } || ([ GameObj.right_hand, GameObj.left_hand ] | GameObj.containers.values.flatten).find { |obj| obj.name =~ /\b#{Regexp.escape(UserVars.bluntskinweapon).sub(' ', ' .*')}$/i } || ([ GameObj.right_hand, GameObj.left_hand ] | GameObj.containers.values.flatten).find { |obj| obj.name =~ /\b#{Regexp.escape(UserVars.bluntskinweapon).sub(' ', ' .*')}/i }
+				echo "warning: failed to find your bluntskinweapon: #{UserVars.bluntskinweapon}"
+			end
+		else
+			echo "warning: failed to find your bluntskinweaponsack: #{UserVars.bluntskinweaponsack}"
+		end
+	else
+		bluntskinweaponsack = nil
+		bluntskinweapon = nil
+	end
+end
+if CharSettings['get-arrows']
+	if UserVars.arrowsack.nil? or UserVars.arrowsack.empty?
+		arrowsack = lootsack
+	else
+		unless arrowsack = GameObj.inv.find { |obj| obj.name =~ /\b#{Regexp.escape(UserVars.arrowsack.strip)}$/i } || GameObj.inv.find { |obj| obj.name =~ /\b#{Regexp.escape(UserVars.arrowsack).sub(' ', ' .*')}$/i } || GameObj.inv.find { |obj| obj.name =~ /\b#{Regexp.escape(UserVars.arrowsack).sub(' ', ' .*')}/i }
+			echo 'error: failed to find your arrowsack'
+			exit
+		end
+	end
+end
+
+before_dying { DownstreamHook.remove 'loot-watch-sack' }
+original_lootsack_list = lootsack_list.dup
+watch_lootsack = proc {
+	unless DownstreamHook.list.include?('loot-watch-sack')
+		remove_count = 0
+		hook_proc = proc { |server_string|
+			if server_string =~ /^<clearContainer.*You remove .* from .* exist="#{original_lootsack_list.first.id}"/
+				remove_count += 1
+				if remove_count > 2
+					DownstreamHook.remove('loot-watch-sack')
+					lootsack_list = original_lootsack_list.dup
+				end
+			elsif server_string =~ /^<clearContainer.*You put .* in .* exist="#{original_lootsack_list.first.id}"/
+				remove_count -= 1
+			end
+			server_string
+		}
+		DownstreamHook.add('loot-watch-sack', hook_proc)
+	end
+}
+
+script_name = script.name.dup
+hook_proc = proc { |client_string|
+	begin
+		if client_string =~ /^(?:<c>)?#{$lich_char}#{script_name}\s+(.*)$/
+			cmd = $1
+			if cmd.downcase == 'list'
+				show_settings.call
+				nil
+			elsif cmd =~ /^(skin|604|kneel|safe\-kneel|stance|empty|never\-empty|phase\-boxes|get\-arrows|eblade\-arrows)=(on|off|yes|no|true|false)$/i
+				fix_setting = { 'on' => true, 'yes' => true, 'true' => true, 'off' => false, 'no' => false, 'false' => false }
+				char_settings[$1.downcase] = fix_setting[$2.downcase]
+				respond "[#{script_name}: setting saved]"
+				nil
+			elsif cmd =~ /^exclude=(.*)$/i
+				if $1 == 'nil'
+					char_settings['exclude'] = nil
+					respond "[#{script_name}: setting cleared]"
+				else
+					char_settings['exclude'] = $1
+					respond "[#{script_name}: setting saved]"
+				end
+				nil
+			elsif cmd =~ /^loot\-?types=(.*)$/i
+				if $1 == 'nil'
+					char_settings['loot-types'] = 'gem|reagent|herb|jewelry|magic|scroll|wand|uncommon|box'
+					respond "[#{script_name}: setting reset]"
+				else
+					char_settings['loot-types'] = $1
+					respond "[#{script_name}: setting saved]"
+				end
+				nil
+			else
+				show_help.call
+				nil
+			end
+		else
+			client_string
+		end
+	rescue
+		UpstreamHook.remove(script_name)
+		client_string
+	end
+}
+before_dying { UpstreamHook.remove(script_name) }
+UpstreamHook.add(script_name, hook_proc)
+
+$loot_dead_npcs  = Array.new
+$loot_grab_list  = Array.new
+$loot_working    = false
+$loot_berserking = false
+
+$loot_stats ||= Hash.new
+$loot_stats['start_time']       ||= Time.now
+$loot_stats['kills']            ||= 0
+$loot_stats['successful_skins'] ||= 0
+$loot_stats['failed_skins']     ||= 0
+$loot_stats['loot_count']       ||= 0
+$loot_arrow_ids                 ||= LimitedArray.new
+$loot_arrow_wait                  = Array.new
+$loot_needs_eblade              ||= Array.new
+$loot_search_rooms              ||= Array.new
+failed_drag_lootsack              = Hash.new
+need_close_lootsack               = Array.new
+
+can_drag = true
+
+exec_string = "
+	hide_me
+	status_tags
+	before_dying { kill_script(#{script.name.inspect}) if running?(#{script.name.inspect}) }
+	Thread.new { wait_while { running?(#{Script.self.name.inspect}) }; Script.self.kill }
+	immolated = LimitedArray.new
+	immolated.max_size = 15
+	weapon_fired = LimitedArray.new
+	weapon_fired.max_size = 15
+	maelstromed = LimitedArray.new
+	maelstromed.max_size = 15
+	lightning_called = LimitedArray.new
+	lightning_called.max_size = 15
+	deity = nil
+	divine_wrath_active = false
+	divine_wrath_message = {
+		'Charl'           => /^White sparks flicker around you, and you sense electrical energy gathering in the instant before a massive bolt of lightning spears toward/,
+		'Cholen'          => /^A throwing knife formed of shimmering golden light hurtles from the hand of one of the spirit jesters toward/,
+		'Eonak'           => /^Within the reddish haze swirling beside/,
+		'Imaera'          => /^A brown stag materializes in midair, leaping out of nowhere to try to impale/,
+		'Jastev'          => /^A beam of .*? light lances away from the rainbow around you to strike/,
+		'Koar'            => /^An aura of divine golden light blazes into existence around/,
+		'Lorminstra'      => /^As several faintly glowing snowflakes settle upon/,
+		'Lumnis'          => /^Guided by the knowledge within you, you concentrate upon/,
+		'Ronan'           => /^Seen only by your spirit gaze, one of the dream unicorns lowers its head and charges fiercely toward/,
+		'Tonis'           => /^Accompanied by a particularly impressive gust of wind, a fleeting golden blur flashes past/,
+		'Gosaena'         => /^An ethereal pair of feathered white wings materializes from midair and closes around/,
+		'Zelia'           => /^You notice .*? nearby\\. How marvelous!/,
+		'Eorgina'         => /^Shimmering black flames lash out toward/,
+		'Fash\\'lo\\'nae' => /^A matte grey scalpel appears from midair, and it moves with evident purpose to take a deliberate, methodical slice at/,
+		'Luukos'          => /^Long, spectral talons materialize from midair to tear viciously at the body of/,
+		'Marlu'           => /^A tendril of black mist suddenly senses the proximity of/,
+		'Mularos'         => /^The ethereal barbed whip that lies loosely coiled around you uncoils at terrifying speed\\. It snaps out toward/,
+		'Sheru'           => /^Suddenly, .*? tries to bolt away, but instead smashes into a wall of spectral force hidden within the shadows!/,
+		'V\\'tull'        => /^Divine will surges through you, and you command the scimitar to strike at/,
+		'the Huntress'    => /^A silver-bladed scythe materializes from thin air, spinning end over end as it hurtles toward/,
+		'Laethe'          => /^A shadowy black rose touches/,
+		'Leya'            => /^A dagger of ivory light suddenly flashes away from the aura surrounding you to strike at/,
+		'Niima'           => /^As the song from the pillar of water crescendos, it reaches a pitch that normally only trained bards can achieve, and the intense waves of elegant sound focus upon/,
+		'Voaris'          => /^A glowing golden rose touches/,
+		# fixme: missing Kai, Oleani, Phoen, Andelas, Ivas, Aeia, Amasalen, Arachne, Jaston, Kuon, Onar, Tilamaire, Voln
+	}
+
+	while line = get
+		if line =~ /<stream id=\"thoughts\">/
+			next
+		elsif line =~ /^(?:<.*?>)?You nock an? .*?<a exist=\"(\\-?[0-9]+)\" noun=\"arrow\">/
+			$loot_arrow_ids.push($1) unless $loot_arrow_ids.include?($1)
+		elsif line =~ /^(?:<.*?>)?The scintillating light fades from an .*?<a exist=\"(\\-?[0-9]+)\" noun=\"arrows\">.*?<\\/a>\\./
+			$loot_needs_eblade.push($1)
+		elsif line =~ /^(?:<.*?>)?The scintillating .*?light surrounding the .*?<a exist=\"(\\-?[0-9]+)\" noun=\"arrow\">.*?<\\/a> fades away\\./
+			$loot_needs_eblade.push($1)
+		elsif line =~ /<comp(?:onent|Def) id='room objs'>.*?<a exist=\"(?:\#{$loot_arrow_ids.join('|')})\".*?<\\/comp(?:onent|Def)>/
+			$loot_grab_list = ($loot_grab_list | GameObj.loot.to_a.find_all { |obj| $loot_arrow_ids.include?(obj.id) }.collect { |obj| obj.id }) - $loot_arrow_wait
+		elsif line =~ /^(?:The|Glancing shot.  The|Bad angle.  The|Lacking the force and angle to lodge in .*?, the) <a exist=\"(\\-?[0-9]+)\" noun=\"arrow\">.*?<\\/a> (?:ricochets away from .*?, landing nearby\\.|zips past its target to the ground\\.|flips over, landing behind .*?\\.|fails to stick in .*?\\.|simply falls\\.|is deflected to one side, sailing to the ground\\.|disappears into the local environs|zips past its target to the ground\\.)/
+			arrow_id = $1.dup
+			if $loot_arrow_ids.include?(arrow_id) and not $loot_arrow_wait.include?(arrow_id)
+				$loot_arrow_wait.push(arrow_id)
+				Thread.new {
+					sleep 16
+					arrow_id = $loot_arrow_wait.shift
+					unless $loot_grab_list.include?(arrow_id) or !GameObj.loot.any? { |obj| obj.id == arrow_id }
+						$loot_grab_list.push(arrow_id)
+					end
+				}
+				if (line =~ /disappears into the local environs/) and (room = Room.current)
+					$loot_search_rooms.push(room.id)
+				end
+			end
+		elsif (line =~ /You (?:swing|gesture|sing|weave another verse|continue to sing|channel|fire|wave|tap|rub|hurl|thrust|slash|throw|punch|attempt to punch|attempt to kick|attempt to throw|quickly dart behind .*? and try to hamstring|mentally attempt to locate your implanted essence|rush forward)|You .*?attempt to (?:kick|punch|jab|grapple)|A wave of power flows out of you and toward|Your (?:<.*?>)?raging sandstorm(?:<.*?>)? swirls around|^The flames surrounding <pushBold\\/>an? <a exist=\"(?:\#{immolated.join('|')})\" noun=\".*?\">.*?<\\/a><popBold\\/> flare up violently\\.\\.\\.|A .*? leaps from a <a.*?>.*?<\\/a> <pushBold\\/>.*?<a exist=\"(?:\#{weapon_fired.join('|')})\".*?>.*?<\\/a><popBold\\/> is wielding\\.|(?:Brilliant flashes of lightning surround|Large hailstones pound relentlessly on|Violent winds tighten around) <pushBold\\/>.*?<a exist=\"(?:\#{maelstromed.join('|')})\" noun=\".*?\">.*?<\\/a><popBold\\/>\\.|Suddenly a lightning bolt explodes from the small thundercloud and strikes <pushBold\\/>.*?<a exist=\"(?:\#{lightning_called.join('|')})\" noun=\".*?\">.*?<\\/a><popBold\\/> with a brilliant flash!/) or (divine_wrath_active and divine_wrath_message[deity] and line =~ divine_wrath_message[deity])
+			candidates = Array.new
+			while (line = get) and (line !~ /Roundtime|A little bit late for that don't you think|<prompt/)
+				if line =~ /^The glimmer of an? <a exist=\"(.*?)\" noun=\".*?\">.*?<\\/a> catches your eye|^<pushBold\\/>A <a exist=\".*?\" noun=\".*?\">.*?<\\/a><popBold\\/> releases a groan of mingled ecstasy and relief as <pushBold\\/><a exist=\".*?\" noun=\".*?\">.*?<\\/a><popBold\\/> fades away, leaving an? <a exist=\"(.*?)\" noun=\".*?\">.*?<\\/a> behind!$/
+					obj_id = $1 || $2
+					$loot_grab_list.push(obj_id) unless $loot_grab_list.include?(obj_id)
+					next
+				elsif line =~ /^(?:The|Glancing shot.  The|Bad angle.  The|Lacking the force and angle to lodge in .*?, the) <a exist=\"(\\-?[0-9]+)\" noun=\"arrow\">.*?<\\/a> (?:ricochets away from .*?, landing nearby\\.|zips past its target to the ground\\.|flips over, landing behind .*?\\.|fails to stick in .*?\\.|simply falls\\.|is deflected to one side, sailing to the ground\\.|disappears into the local environs\\.|zips past its target to the ground\\.)/
+					arrow_id = $1.dup
+					if $loot_arrow_ids.include?(arrow_id) and not $loot_arrow_wait.include?(arrow_id)
+						$loot_arrow_wait.push(arrow_id)
+						Thread.new {
+							sleep 16
+							arrow_id = $loot_arrow_wait.shift
+							$loot_grab_list.push(arrow_id) unless $loot_grab_list.include?(arrow_id) or !GameObj.loot.any? { |obj| obj.id == arrow_id }
+						}
+					end
+					if (line =~ /disappears into the local environs/) and (room = Room.current)
+						$loot_search_rooms.push(room.id)
+					end
+				elsif line =~ /Wisps of black smoke swirl around <pushBold\\/>.*?<a exist=\"(.*?)\" noun=\".*?\">.*?<\\/a><popBold\\/> and s?he bursts into flame!/
+					immolated.push($1) unless immolated.include?($1)
+				elsif line =~ /You successfully hit <pushBold\\/>.*?<a exist=\"(.*?)\".*?>.*?<\\/a><popBold\\/> <a.*?>.*?<\\/a> with the spell\\./
+					weapon_fired.push($1) unless weapon_fired.include?($1)
+				elsif line =~ /A stiff breeze begins to swirl around <pushBold\\/>.*?<a exist=\"(.*?)\" noun=\".*?\">.*?<\\/a><popBold\\/>\\./
+					maelstromed.push($1) unless maelstromed.include?($1)
+				elsif line =~ /You notice a small cloud form above <pushBold\\/>.*?<a exist=\"(.*?)\" noun=\".*?\">.*?<\\/a><popBold\\/>\\./
+					lightning_called.push($1)
+				elsif line =~ /^As you pour your soul into an appeal to (.*?), /
+					deity = $1
+					divine_wrath_active = true
+				elsif line =~ /^A final rumble of thunder rolls through the area, and, as its last echoes fade away, your skin ceases to tingle as your connection to Charl lessens\\.|^Your connection to Cholen lessens\\. The airy, brisk trill of a well-played fife and a quick cymbal crash heralds the departure of the spirit jesters\\.|^The ruddy haze near you dissipates, and the sound of the forging hammer dies away\\. As the forge-fire's heat leaves your skin, your connection to Eonak lessens\\.|^You sense the last of the spirit animals running away unseen, and the aroma of forest loam fades as your connection to Imaera lessens\\.|^The iridescent lights surrounding you pop like soap bubbles, one by one, until the last one bursts in a small flare of starry radiance and is gone\\. Your connection to Jastev lessens\\.|^Your connection to Koar lessens, and the divine light fades around you\\. The ground shudders one last time before falling still\\.|^As your connection to Lorminstra lessens, the snowflakes stop falling, and the few that still cling to you melt away\\. The icy cold gradually lifts from your body\\.|^As your connection to Lumnis lessens, the world of divine insight slips away from you, destroying the subtle understanding that you so briefly managed to grasp\\.|^You lose sight of the dream unicorns and the barren plain upon which they run as your connection to Ronan lessens\\. The waking world seems brighter again as the sense of dreamlike lassitude leaves you\\.|^You glimpse the golden blur one last time, but then you lose track of it entirely as your connection to Tonis lessens\\. The wind's force lessens as well, and then the air falls still\\.|^You realize that you had ceased to hear the sound of your own heartbeat only when you become aware of it again, and other sounds filter back into your awareness as well\\. Warmth returns to your body as your connection to Gosaena lessens\\.|^Suddenly, the important insights slip away, leaving you drained and exhausted as you plummet back to a more mundane state of mind\\. Your throat and sides are slightly sore, and your cheeks are wet with tears\\. Your connection to Zelia has lessened\\.|^Your connection to Eorgina lessens, and the black flames instantly vanish, leaving you stranded and bereft of the presence of the Arkati's power\\.|^Your connection to Fash'lo'nae lessens\\.  The quiet sound of a blade being honed persists a moment longer before fading away into silence\\.|^A spectral howl echoes through the air, resonant with pain and anguish\\. Your skin prickles again as your connection to Luukos lessens\\.|^As your connection to Mularos lessens, the cold, invisible collar locked about your throat fades into a compassionate caress, and a similar caress traces its way across the side of your cheek\\. Beneath that gentle touch, the wounds upon your face heal immediately\\. The ethereal barbed whip twitches one last time before dissolving back into air\\.|^Your connection to Sheru lessens, and the murky shadows brought by your appeal fade away, yet the feeling of being watched does not\\. On any night, in any dream or nightmare, those amber eyes will follow you endlessly\\.\\.\\. but such is the prize and the price of your devotion\\.|^As your connection to the Huntress lessens, the foreign anger that lent you strength passes from your body as well, and your heartbeat returns to its regular pace\\.|^You feel the kiss of benediction once more upon your brow, and then your connection to Laethe lessens\\. The shadowy black roses dissolve into tendrils of black, rose-scented smoke that dissipate rapidly\\.|^The ivory light around you fades and glimmers out, and the strength and control of your movements lessens along with your connection to Leya\\.|^The singing from the watery pillar begins to fade as your connection to Niima lessens\\. The pillar thins, then suddenly drops with a great splash! You are utterly drenched in water\\.|^You feel the kiss of benediction once more upon your brow, and then your connection to Voaris lessens\\. One of the glowing golden roses lights with scarlet flame, and the fire spreads rapidly down the vine until every rose is burning\\. The flames consume the roses swiftly and without smoke, until, in less than a second, the roses are gone entirely\\./
+					# fixme: missing Kai, Oleani, Phoen, Andelas, Ivas, Marlu, V'tull, Aeia, Amasalen, Arachne, Jaston, Kuon, Onar, Tilamaire, Voln
+					divine_wrath_active = false
+				end
+				if line =~ /<a exist=['\"](.*?)['\"]/
+					candidates.push($1) unless candidates.include?($1)
+				end
+			end
+			for obj_id in candidates
+				if (npc = GameObj.npcs.find { |npc| npc.id == obj_id }) and (npc.status == 'dead')
+					unless $loot_dead_npcs.include?(obj_id)
+						$loot_dead_npcs.push(obj_id) unless (npc.name =~ /ice golem|fire elemental|skayl|lava golem|mein golem|mein android/)
+						$loot_stats['kills'] += 1
+					end
+				end
+			end
+		elsif line =~ /^You spy .*?<a exist=\"(.*?)\" noun=\".*?\">.*?<\\/a>, which looks like the heirloom that you are searching for!$/
+			$loot_grab_list.push($1) unless $loot_grab_list.include?($1)
+		elsif line =~ /^You cannot do that while berserking\.$|^Everything around you turns red as you work yourself into a berserker's rage!|^You rage across the battlefield, striking with unrelenting fury!/
+			$loot_berserking = true
+		elsif line =~ /^The redness fades from the world and you begin to breathe harder\.$/
+			$loot_berserking = false
+		end
+	end
+"
+start_exec_script(exec_string, flags={ :quiet => true })
+
+lootsack_put = proc { |obj|
+	done_been_put = false
+	rotate_lootsack = 0
+	$loot_stats['loot_count'] += 1
+	for lootsack in lootsack_list
+		unless failed_drag_lootsack[lootsack.id]
+			result = dothistimeout "_drag ##{obj.id} ##{lootsack.id}", 4, /You put|^You slip your hand|You need a free hand to pick that up\.|It's closed!|^Your .*? won't fit in .*?\.$|^I could not find what you were referring to\.|^Do you want to put that in or on|^You carefully place|^You wipe off the blade and sheathe/
+			if result =~ /^Do you want to put that in or on/
+				failed_drag_lootsack[lootsack.id] = true
+				result = dothistimeout "put ##{obj.id} in ##{lootsack.id}", 4, /^You put|^You slip your hand|It's closed!|^Your .*? won't fit in .*?\.$|^I could not find what you were referring to\.|^You carefully place|^You wipe off the blade and sheathe/
+			end
+		else
+			unless (GameObj.right_hand.id == obj.id) or (GameObj.left_hand.id == obj.id)
+				dothistimeout "get ##{obj.id}", 4, /^You pick up|^You remove|^You need a free hand to pick that up\.|^I could not find what you were referring to\./
+			end
+			result = dothistimeout "put ##{obj.id} in ##{lootsack.id}", 4, /^You put|^You slip your hand|It's closed!|^Your .*? won't fit in .*?\.$|^I could not find what you were referring to\.|^You carefully place|^You wipe off the blade and sheathe/
+		end
+		if result =~ /It's closed!/
+			dothistimeout "open ##{lootsack.id}", 3, /^You open|^That is already open\./
+			need_close_lootsack.push(lootsack.id)
+			result = dothistimeout "put ##{obj.id} in ##{lootsack.id}", 4, /You put|^You slip your hand|You need a free hand to pick that up\.|It's closed!|^Your .*? won't fit in .*?\.$|^I could not find what you were referring to\.|^You carefully place|^You wipe off the blade and sheathe/
+		end
+		if result =~ /won't fit/
+			rotate_lootsack += 1
+			watch_lootsack.call
+		else
+			$new_loot.push(obj.id)
+			if CharSettings['phase-boxes'] and (obj.type =~ /box/) and Spell[704].known? and Spell[704].affordable?
+				loop {
+					result = cast 704, obj
+					break unless (result =~ /^\[Spell Hindrance for/) and Spell[704].affordable?
+				}
+			end
+			done_been_put = true
+			break
+		end
+	end
+	rotate_lootsack.times { lootsack_list.push(lootsack_list.shift) }
+	unless done_been_put
+		fput "drop ##{obj.id}"
+	end
+}
+
+loop {
+	if ($loot_dead_npcs.empty? and $loot_grab_list.empty?) or $loot_berserking
+		$loot_working = false
+		script.want_downstream = false
+		clear
+		wait_while { ($loot_dead_npcs.empty? and $loot_grab_list.empty?) or $loot_berserking }
+	end
+	$loot_working = true
+	need_fill_hand = false
+	need_fill_left_hand = false
+	need_fill_right_hand = false
+	save_stance = nil
+	waitrt?
+	script.want_downstream = true
+	right_hand_save = GameObj.right_hand
+	unless $loot_dead_npcs.empty?
+		dead_npcs = Array.new
+		while target = $loot_dead_npcs.shift
+			if (dead_npc = GameObj.npcs.find { |npc| npc.id == target }) and (dead_npc.status == 'dead')
+				dead_npcs.push(dead_npc)
+			end
+		end
+		if CharSettings['skin'] and dead_npcs.any? { |npc| not Settings['unskinnable'].include?(npc.name) and (not CharSettings['never-empty'] or (GameObj.right_hand.id == skinweapon.id and GameObj.left_hand.id.nil?) or (GameObj.left_hand.id == skinweapon.id and GameObj.right_hand.id.nil?) or (GameObj.left_hand.id.nil? and GameObj.right_hand.id.nil?) or not Settings['free-hand-skinnable'].include?(npc.name)) }
+			unless (GameObj.right_hand.id == skinweapon.id) or (GameObj.left_hand.id == skinweapon.id)
+				empty_hand
+				need_fill_hand = true
+				dothistimeout("get ##{skinweapon.id}", 4, /^You remove|^You already have that|^You slip a hand|^You unsheathe the/)
+			end
+			if CharSettings['604'] and (skinning = Spell[604]) and skinning.known? and skinning.affordable? and not skinning.active?
+				skinning.cast
+			end
+			if CharSettings['kneel'] or (CharSettings['safe kneel'] and not GameObj.npcs.any? { |npc| npc.status !~ /dead/ })
+				dothistimeout 'kneel', 2, /You kneel/
+			end
+			if CharSettings['stance'] and stance != 'offensive'
+				save_stance = stance
+				dothistimeout 'stance offensive', 2, /You are now in an offensive stance/
+			end
+			if CharSettings['empty'] and GameObj.right_hand.id and (GameObj.right_hand.id != skinweapon.id)
+				need_fill_right_hand = true
+				empty_right_hand
+			end
+			if CharSettings['empty'] and GameObj.left_hand.id and (GameObj.left_hand.id != skinweapon.id)
+				need_fill_left_hand = true
+				empty_left_hand
+			end
+			for target in dead_npcs
+				unless (target.status =~ /gone/) or Settings['unskinnable'].include?(target.name) or Settings['free-hand-skinnable'].include?(target.name)
+					if GameObj.left_hand.id == skinweapon.id
+						skin_result = dothistimeout "skin ##{target.id} left", 2, /^You (?:skinned|botched)|^You might want to wait until after it is dead|^You can only skin creatures|has already been skinned|^You cannot skin|^Could not find your target creature|unable to cut|^You are unable to (?:properly )?break through|^You need a free hand to do that!/
+					else
+						skin_result = dothistimeout "skin ##{target.id}", 2, /You (?:skinned|botched)|You might want to wait until after it is dead|You can only skin creatures|has already been skinned|You cannot skin|Could not find your target creature|unable to cut|^You are unable to (?:properly )?break through|^You need a free hand to do that!/
+					end
+					if skin_result =~ /You cannot skin/
+						Settings['unskinnable'].push(target.name)
+					elsif skin_result =~ /unable to cut|^You are unable to (?:properly )?break through/
+						Settings['unskinnable'].push(target.name)
+						Settings['blunt-skinnable'].push(target.name)
+					elsif skin_result =~ /You need a free hand/
+						Settings['free-hand-skinnable'].push(target.name)
+					elsif skin_result =~ /yielding an? <a exist="(.*?)"/
+						$loot_grab_list.push($1) unless $loot_grab_list.include?($1)
+						$loot_stats['successful_skins'] += 1
+					else
+						$loot_stats['failed_skins'] += 1
+					end
+				end
+			end
+			if ((GameObj.right_hand.id == bluntskinweapon.id and GameObj.left_hand.id.nil?) or (GameObj.left_hand.id == bluntskinweapon.id and GameObj.right_hand.id.nil?) or (GameObj.left_hand.id.nil? and GameObj.right_hand.id.nil?) or not CharSettings['never-empty']) and dead_npcs.any? { |npc| (npc.status !~ /gone/) and not Settings['unskinnable'].include?(target.name) and Settings['free-hand-skinnable'].include?(target.name) }
+				if GameObj.right_hand.id and (GameObj.right_hand.id != skinweapon.id)
+					need_fill_right_hand = true
+					empty_right_hand
+				end
+				if GameObj.left_hand.id and (GameObj.left_hand.id != skinweapon.id)
+					need_fill_left_hand = true
+					empty_left_hand
+				end
+				for target in dead_npcs
+					unless (target.status =~ /gone/) or Settings['unskinnable'].include?(target.name) or not Settings['free-hand-skinnable'].include?(target.name)
+						if GameObj.left_hand.id == skinweapon.id
+							skin_result = dothistimeout "skin ##{target.id} left", 2, /^You (?:skinned|botched)|^You might want to wait until after it is dead|^You can only skin creatures|has already been skinned|^You cannot skin|^Could not find your target creature|unable to cut|^You are unable to (?:properly )?break through/
+						else
+							skin_result = dothistimeout "skin ##{target.id}", 2, /You (?:skinned|botched)|You might want to wait until after it is dead|You can only skin creatures|has already been skinned|You cannot skin|Could not find your target creature|unable to cut|^You are unable to (?:properly )?break through/
+						end
+						if skin_result =~ /You cannot skin/
+							Settings['unskinnable'].push(target.name)
+						elsif skin_result =~ /unable to cut|^You are unable to (?:properly )?break through/
+							Settings['unskinnable'].push(target.name)
+							Settings['blunt-skinnable'].push(target.name)
+						elsif skin_result =~ /yielding an? <a exist="(.*?)"/
+							$loot_grab_list.push($1) unless $loot_grab_list.include?($1)
+							$loot_stats['successful_skins'] += 1
+						else
+							$loot_stats['failed_skins'] += 1
+						end
+					end
+				end
+			end
+			if need_fill_hand
+				dothistimeout "put ##{skinweapon.id} in ##{skinweaponsack.id}", 2, /You put|^You slip your hand|^You carefully place|^You wipe off the blade and sheathe/
+			end
+		end
+		if CharSettings['skin'] and bluntskinweapon and dead_npcs.any? { |npc| Settings['blunt-skinnable'].include?(npc.name) and (not CharSettings['never-empty'] or (GameObj.right_hand.id == bluntskinweapon.id and GameObj.left_hand.id.nil?) or (GameObj.left_hand.id == bluntskinweapon.id and GameObj.right_hand.id.nil?) or (GameObj.left_hand.id.nil? and GameObj.right_hand.id.nil?) or not Settings['free-hand-skinnable'].include?(npc.name)) }
+			unless (GameObj.right_hand.id == bluntskinweapon.id) or (GameObj.left_hand.id == bluntskinweapon.id)
+				empty_hand
+				need_fill_hand = true
+				dothistimeout("get ##{bluntskinweapon.id}", 4, /^You remove|^You already have that|^You slip a hand|^You unsheathe the/)
+			end
+			if CharSettings['604'] and (skinning = Spell[604]) and skinning.known? and skinning.affordable? and not skinning.active?
+				skinning.cast
+			end
+			if CharSettings['kneel'] or (CharSettings['safe kneel'] and not GameObj.npcs.any? { |npc| npc.status !~ /dead/ })
+				dothistimeout 'kneel', 2, /You kneel/
+			end
+			if CharSettings['stance'] and stance != 'offensive'
+				save_stance = stance
+				dothistimeout 'stance offensive', 2, /You are now in an offensive stance/
+			end
+			if CharSettings['empty'] and GameObj.right_hand.id and (GameObj.right_hand.id != bluntskinweapon.id)
+				need_fill_right_hand = true
+				empty_right_hand
+			end
+			if CharSettings['empty'] and GameObj.left_hand.id and (GameObj.left_hand.id != bluntskinweapon.id)
+				need_fill_left_hand = true
+				empty_left_hand
+			end
+			for target in dead_npcs
+				if (target.status !~ /gone/) and Settings['blunt-skinnable'].include?(target.name) and not Settings['free-hand-skinnable'].include?(target.name)
+					if GameObj.left_hand.id == bluntskinweapon.id
+						skin_result = dothistimeout "skin ##{target.id} left", 2, /^You (?:skinned|botched)|^You might want to wait until after it is dead|^You can only skin creatures|has already been skinned|^You cannot skin|^Could not find your target creature|unable to cut|^You are unable to (?:properly )?break through|You .*? withdraw (?:a|an|some) <a exist="\-?[0-9]+"|You .*? but find nothing\.|^You need a free hand to do that!/
+					else
+						skin_result = dothistimeout "skin ##{target.id}", 2, /You (?:skinned|botched)|You might want to wait until after it is dead|You can only skin creatures|has already been skinned|You cannot skin|Could not find your target creature|unable to cut|^You are unable to (?:properly )?break through|You .*? withdraw (?:a|an|some) <a exist="\-?[0-9]+"|You .*? but find nothing\.|^You need a free hand to do that!/
+					end
+					if skin_result =~ /You .*? withdraw (?:a|an|some) <a exist="(\-?[0-9]+)"/
+						skin_id = $1
+						$loot_stats['successful_skins'] += 1
+						if GameObj.right_hand.id == skin_id
+							lootsack_put.call(GameObj.right_hand)
+						elsif GameObj.left_hand.id == skin_id
+							lootsack_put.call(GameObj.left_hand)
+						else
+							$loot_grab_list.push(skin_id) unless $loot_grab_list.include?(skin_id)
+						end
+					elsif skin_result =~ /You cannot skin/
+						Settings['unskinnable'].push(target.name)
+					elsif skin_result =~ /unable to cut|^You are unable to (?:properly )?break through/
+						Settings['unskinnable'].push(target.name)
+					elsif skin_result =~ /You need a free hand to do that!/
+						Settings['free-hand-skinnable'].push(target.name)
+					elsif skin_result =~ /yielding an? <a exist="(.*?)"/
+						$loot_grab_list.push($1) unless $loot_grab_list.include?($1)
+						$loot_stats['successful_skins'] += 1
+					else
+						$loot_stats['failed_skins'] += 1
+					end
+				end
+			end
+			if ((GameObj.right_hand.id == bluntskinweapon.id and GameObj.left_hand.id.nil?) or (GameObj.left_hand.id == bluntskinweapon.id and GameObj.right_hand.id.nil?) or (GameObj.left_hand.id.nil? and GameObj.right_hand.id.nil?) or not CharSettings['never-empty']) and dead_npcs.any? { |npc| (npc.status !~ /gone/) and Settings['blunt-skinnable'].include?(target.name) and Settings['free-hand-skinnable'].include?(target.name) }
+				if GameObj.right_hand.id and (GameObj.right_hand.id != bluntskinweapon.id)
+					need_fill_right_hand = true
+					empty_right_hand
+				end
+				if GameObj.left_hand.id and (GameObj.left_hand.id != bluntskinweapon.id)
+					need_fill_left_hand = true
+					empty_left_hand
+				end
+				for target in dead_npcs
+					if (target.status !~ /gone/) and Settings['blunt-skinnable'].include?(target.name) and Settings['free-hand-skinnable'].include?(target.name)
+						if GameObj.left_hand.id == bluntskinweapon.id
+							skin_result = dothistimeout "skin ##{target.id} left", 2, /^You (?:skinned|botched)|^You might want to wait until after it is dead|^You can only skin creatures|has already been skinned|^You cannot skin|^Could not find your target creature|unable to cut|^You are unable to (?:properly )?break through|You .*? withdraw (?:a|an|some) <a exist="\-?[0-9]+"|You .*? but find nothing\./
+						else
+							skin_result = dothistimeout "skin ##{target.id}", 2, /You (?:skinned|botched)|You might want to wait until after it is dead|You can only skin creatures|has already been skinned|You cannot skin|Could not find your target creature|unable to cut|^You are unable to (?:properly )?break through|You .*? withdraw (?:a|an|some) <a exist="\-?[0-9]+"|You .*? but find nothing\./
+						end
+						if skin_result =~ /You .*? withdraw (?:a|an|some) <a exist="(\-?[0-9]+)"/
+							skin_id = $1
+							$loot_stats['successful_skins'] += 1
+							if GameObj.right_hand.id == skin_id
+								lootsack_put.call(GameObj.right_hand)
+							elsif GameObj.left_hand.id == skin_id
+								lootsack_put.call(GameObj.left_hand)
+							else
+								$loot_grab_list.push(skin_id) unless $loot_grab_list.include?(skin_id)
+							end
+						elsif skin_result =~ /You cannot skin/
+							Settings['unskinnable'].push(target.name)
+						elsif skin_result =~ /unable to cut|^You are unable to (?:properly )?break through/
+							Settings['unskinnable'].push(target.name)
+						elsif skin_result =~ /yielding an? <a exist="(.*?)"/
+							$loot_grab_list.push($1) unless $loot_grab_list.include?($1)
+							$loot_stats['successful_skins'] += 1
+						else
+							$loot_stats['failed_skins'] += 1
+						end
+					end
+				end
+			end
+			if need_fill_hand
+				dothistimeout "put ##{bluntskinweapon.id} in ##{bluntskinweaponsack.id}", 2, /You put|^You slip your hand|^You carefully place|^You wipe off the blade and sheathe/
+			end
+		end
+		if need_fill_left_hand
+			fill_left_hand
+		end
+		if need_fill_right_hand
+			fill_right_hand
+		end
+		unless standing?
+			fput 'stand'
+			waitrt?
+		end
+		if save_stance
+			fput "stance #{save_stance}"
+		end
+		for target in dead_npcs
+			next if target.status =~ /gone/
+			search_result = dothistimeout "search ##{target.id}", 4, /You search|What were you referring to|Could not find a valid target to loot|You plunge your hand into/
+			if search_result =~ /You plunge your hand into .*? withdraw your arm to find a .*? (\w+) in your grasp!/
+				echo 'fixme'
+				fput 'stow right'
+			elsif search_result =~ /You search/
+				while (line = get) and (line !~ /prompt/)
+					if line =~ /exist="(.*?)".*which looks like the heirloom that you are searching for/
+						$loot_grab_list.push($1) unless $loot_grab_list.include?($1)
+					else
+						for link in line.scan(/<a.*?>.*?<\/a>/)
+							if link =~ /<a exist="(.*?)" noun="(.*?)">(.*?)<\/a>/
+								exist, noun, name = $1, $2, $3
+								next if name =~ /^(?:he|she|it|her|his|him|its|itself)$|'s$/i
+								unless thing = GameObj.loot.find { |obj| obj.id == exist }
+									thing = GameObj.new(exist, noun, name)
+								end
+								if thing.type.nil?
+									Script.log "#{Time.now.strftime("%Y-%m-%d %I:%M%P")}: missing type for: #{thing.name}"
+								elsif (thing.type =~ /junk/) or (CharSettings['exclude'] and thing.name =~ /#{CharSettings['exclude']}/)
+									nil
+								elsif thing.type =~ /#{CharSettings['loot-types']}/
+									$loot_grab_list.push(thing.id) unless $loot_grab_list.include?(thing.id)
+									unless thing.sellable or (thing.type =~ /herb/)
+										Script.log "#{Time.now.strftime("%Y-%m-%d %I:%M%P")}: missing sellable for: #{thing.name}"
+									end
+								end
+							end
+						end
+					end
+				end
+			end
+		end
+	end
+	if CharSettings['get-arrows'] and not $loot_search_rooms.empty? and not GameObj.npcs.any? { |npc| (npc.type !~ /passive npc/) and (npc.status !~ /dead/) } and (room = Room.current) and $loot_search_rooms.include?(room.id)
+		$loot_search_rooms.count(room.id).times {
+			dothistimeout 'search', 2, /^You don't find|^You spy/
+			waitrt?
+		}
+		$loot_search_rooms.delete(room.id)
+	end
+	if $loot_grab_list.empty?
+		if need_fill_hand
+			fill_hand
+		end
+	else
+		need_close_disk = false
+		unless need_fill_hand
+			empty_hand
+		end
+		while obj_id = $loot_grab_list.shift
+			unless obj = GameObj.loot.find { |o| o.id == obj_id }
+				next if CharSettings['get-arrows'] and $loot_arrow_ids.include?(obj_id)
+				dothistimeout "get ##{obj_id}", 2, /^You pick up|^You remove/
+				if GameObj.right_hand.id == obj_id
+					obj = GameObj.right_hand
+				elsif GameObj.left_hand.id == obj_id
+					obj = GameObj.left_hand
+				else
+					echo 'fixme'
+					next
+				end
+			end
+			if (obj.type =~ /box/) and ((disk = GameObj.loot.find { |o| o.name =~ /#{Char.name} disk$/ }) or reget.any? { |line| line =~ /^Your disk arrives, following you dutifully\.\r?$/ })
+				25.times { break if GameObj.loot.any? { |o| o.name =~ /#{Char.name} disk$/ }; sleep 0.1 }
+				if disk
+					result = dothistimeout "_drag ##{obj.id} ##{disk.id}", 2, /You put|You need a free hand to pick that up\.|It's closed!|^Your .*? won't fit in .*?\.$/
+					if result =~ /It's closed!/
+						dothistimeout "open ##{disk.id}", 3, /^You open|^That is already open\./
+						need_close_disk = true
+						result = dothistimeout "_drag ##{obj.id} ##{disk.id}", 2, /You put|You need a free hand to pick that up\.|It's closed!|^Your .*? won't fit in .*?\.$/
+					end
+					if result =~ /You put/
+						$new_loot.push(obj.id)
+						next
+					end
+				end
+			end
+			while CharSettings['eblade-arrows'] and (eblade = Spell[411]) and eblade.known? and eblade.affordable? and (arrow_id = $loot_needs_eblade.shift)
+				if arrow = (GameObj.loot.to_a + arrowsack.contents.to_a).find { |obj| obj.id == arrow_id }
+					waitcastrt?
+					result = eblade.cast(arrow)
+					if (result == false) or (result =~ /^\[Spell Hindrance/)
+						arrow_id = $loot_needs_eblade.unshift(arrow_id)
+					end
+				end
+			end
+			if CharSettings['get-arrows'] and $loot_arrow_ids.include?(obj.id)
+				next unless GameObj.loot.any? { |o| o.id == obj_id }
+				next if $loot_arrow_wait.include?(obj.id)
+				# fixme: bundle full, use more than one bundle, bundle arrows when there's no bundle
+				if bundle = arrowsack.contents.find { |o| o.noun == 'arrows' }
+					if GameObj.loot.find_all { |o| o.noun == 'arrow' }.length > 2
+						dothistimeout "gather ##{obj.id}", 4, /^You gather|^You pick up|^You need a free hand to pick that up\.|^I could not find what you were referring to\.|^Get what\?|^The .*? is out of your reach\.|^You remove/
+						result = dothistimeout "put my arrow in ##{bundle.id}", 4, /^You add|^You bundle|^I could not find what you were referring to\.|^You cannot bundle these together\./
+					else
+						result = dothistimeout "_drag ##{obj.id} ##{bundle.id}", 4, /You add|You need a free hand to pick that up\.|^I could not find what you were referring to\.|^Get what\?|^The .*? is out of your reach\.|^You cannot bundle these together\./
+					end
+					if result =~ /^You cannot bundle these together\./
+						result = dothistimeout "put my arrow in ##{arrowsack.id}", 4, /^You put|^You slip your hand|^You carefully place|^You wipe off the blade and sheathe/
+					end
+				else
+					result = dothistimeout "_drag ##{obj.id} ##{arrowsack.id}", 4, /^You put|^You slip your hand|^You carefully place|^You wipe off the blade and sheathe/
+				end
+			else
+				lootsack_put.call(obj)
+			end
+		end
+		fill_hand
+		for lootsack_id in need_close_lootsack
+			dothistimeout "close ##{lootsack_id}", 3, /^You close|^That is already closed;\./
+		end
+		need_close_lootsack.clear
+		if need_close_disk
+			dothistimeout "close ##{disk.id}", 3, /^You close|^That is already closed;\./
+		end
+	end
+}
+
+# You are unable to break through the krag dweller's stone hide with a dagger!
+
+=begin
+	arrow gets hidden, option to search when nothing is alive
+	can't pick up arrow for x seconds, option to wait when nothing is alive
+	start second bundle when charges run out
+		keep track of charged/dead bundle
+		option to eblade/bless dead arrows
+
+	The <a exist="14692818" noun="arrow">wooden arrow</a> disappears into the local environs.
+
+	The scintillating red light surrounding the arrow fades away.
+	The scintillating light fades from a <a exist="14575103" noun="arrows">bundle of wooden arrows</a>.
+	You cannot bundle these together.
+
+	only gather after kill
+	only gather with no live npcs
+	search for arrows
+	wait for arrows
+	e-blade arrows
+	bless arrows
+
+	You are unable to properly break through the greater krynch's rocky hide with a straight razor.
+=end

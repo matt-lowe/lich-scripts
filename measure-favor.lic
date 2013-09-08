@@ -1,0 +1,278 @@
+=begin
+
+	This script measures symbol favor costs to help figure out the favor formula.
+
+	Intened for use near Wehnimer's landing.  You won't have any favor when the script finishes.
+
+	tillmen@lichproject.org
+
+=end
+
+if XMLData.level < 32 or XMLData.level == 100
+	echo 'The symbol favor costs for your level are already known.'
+	exit
+end
+
+if XMLData.game != 'GSF'
+	if XMLData.game == 'GSIV' or XMLData.game == 'GSPlat'
+		echo "This script spams symbol of thought, and may get you in trouble.  The script will take you to Icemule Trail before using symbol of though, where the thoughts won't be heard outside a 21 room area."
+		echo 'Unpause or kill the script to continue.'
+		pause_script
+	else
+		echo "I don't know what game you're playing..."
+		exit
+	end
+end
+
+unless running?('sexual-favors')
+	echo 'sexual-favors must be running for this script to work.'
+	exit
+end
+
+attack_spell_list = [ 702, 904, 302 ]
+
+unless attack_spell_list.any? { |num| Spell[num].known? }
+	echo "This script doesn't know how to hunt your character."
+	exit
+end
+
+# if you change the script to hunt something else, keep it under level 20 to avoid variable level undead and inaccurate results
+room_id_list = [ "4183", "4184", "4185", "4186", "4187", "4188", "4189", "4190", "4175", "4176", "4177", "4178", "4179", "4180", "4181", "4182", "4192", "4191", "4194", "4193" ]
+room_history = Array.new
+
+unless Room.current
+	echo 'Your current room is unknown.'
+	exit
+end
+
+unless (path = Room.current.path_to(room_id_list.first)) or Room.current.id == room_id_list.first.to_i
+	echo "Can't find a path to the hunting ground (the graveyard)."
+	exit
+end
+
+if path.include?(1192) or path.include?(11749)
+	echo "This script is intended to run in Wehnimer's Landing."
+	exit
+end
+
+wander = proc {
+	if room = Room.current
+		valid_adjacent_rooms = room.wayto.keys & room_id_list
+		unvisited_adjacent_rooms = valid_adjacent_rooms.find_all { |r| not room_history.include?(r) }
+		if unvisited_adjacent_rooms.length > 0
+			next_room = unvisited_adjacent_rooms[rand(next_room.length)]
+		else
+			next_room = room_history.find { |r| valid_adjacent_rooms.include?(r) }
+		end
+		if next_room
+			room_history.delete(next_room)
+			room_history.push(next_room)
+			way = room.wayto[next_room]
+			if way.class == String 
+				move(way)
+			else
+				way.call
+			end
+		else
+			start_script 'go2', [ Room.current.find_nearest(room_id_list.collect { |id| id.to_i }).to_s ]
+			wait_while { running?('go2') }
+		end
+	else
+		echo 'current room is unknown'
+		if XMLData.exits.length > 0
+			sleep 3
+			move XMLData.exits[rand(XMLData.exits.length)]
+		else
+			exit
+		end
+	end
+}
+
+get_favor = proc {
+	start_favor = $favor[:symbol]
+	while $favor[:symbol] == start_favor
+		while GameObj.npcs.any? { |npc| npc.noun == 'wraith' and npc.status !~ /dead/ } and $favor[:symbol] == start_favor
+			if attack_spell = attack_spell_list.find { |num| Spell[num].known? }
+				unless Spell[attack_spell].affordable?
+					echo 'waiting for mana...'
+					wait_until { Spell[attack_spell].affordable? }
+				end
+				result = cast attack_spell
+				waitcastrt?
+			else
+				# fixme
+			end
+		end
+		death_count = GameObj.npcs.find_all { |npc| npc.noun == 'wraith' and npc.status =~ /dead/ }
+		if death_count > 0
+			if running?('loot')
+				10.times { break unless GameObj.npcs.any? { |npc| npc.status == 'dead' }; sleep 0.2 }
+				20.times { break unless $loot_working; waitrt?; sleep 0.2 }
+			else
+				death_count.times { fput 'search wraith' }
+			end
+		end
+		sleep 0.1
+		break unless $favor[:symbol] == start_favor
+		wander.call
+		wander.call while checkpcs
+	end
+}
+
+blessable_dagger_id = nil
+
+use_symbol = proc { |symbol|
+	waitrt?
+	waitcastrt?
+	favor_before = $favor[:symbol]
+	if symbol == 'thought'
+		if XMLData.game == 'GSIV' or XMLData.game == 'GSPlat'
+			start_script 'go2', [ '2557' ]
+			wait_while { running?('go2') }
+		end
+		result = dothis "symbol of thought ab", /^You concentrate on the Symbol of Thought|^You strain/
+		if result =~ /^You concentrate on the Symbol of Thought/
+			wait_while { favor_before == $favor[:symbol] }
+			true
+		else
+			false
+		end
+	elsif symbol == 'blessing'
+		if blessable_dagger_id.nil?
+			start_script 'go2', [ '400' ]
+			wait_while { running?('go2') }
+			fput 'withdraw 20'
+			start_script 'go2', [ '402' ]
+			wait_while { running?('go2') }
+			empty_hands
+			fput 'order 2'
+			fput 'buy'
+			wait_until { GameObj.right_hand.id }
+			blessable_dagger_id = GameObj.right_hand.id
+			fput "stow ##{blessable_dagger_id}"
+			fill_hands
+		end
+		result = dothis "symbol of blessing ##{blessable_dagger_id}", /^A brilliant white light|^You strain/
+		if result =~ /^You strain/
+			false
+		else
+			empty_hands
+			fput "_drag ##{blessable_dagger_id} drop"
+			blessable_dagger_id = nil
+			fill_hands
+			wait_while { favor_before == $favor[:symbol] }
+			true
+		end
+	elsif symbol == 'courage'
+		result = dothis 'symbol of courage', /^You feel more courageous|^You strain/
+		if result =~ /^You feel more courageous/
+			wait_while { favor_before == $favor[:symbol] }
+			true
+		else
+			false
+		end
+	elsif symbol == 'sleep'
+		until target = GameObj.npcs.find { |npc| npc.noun == 'wraith' and npc.status !~ /dead/ }
+			wander.call
+			wander.call while checkpcs
+		end
+		result = dothis "symbol of sleep ##{target.id}", /^You draw a glowing pattern in the air before|^You strain/
+		if result =~ /^You draw a glowing pattern in the air before/
+			wait_while { favor_before == $favor[:symbol] }
+			true
+		else
+			false
+		end
+	elsif symbol == 'diminishment'
+		until target = GameObj.npcs.find { |npc| npc.noun == 'wraith' and npc.status !~ /dead/ }
+			wander.call
+			wander.call while checkpcs
+		end
+		result = dothis "symbol of diminish ##{target.id}", /appears diminished|is unaffected|^You strain/
+		if result =~ /appears diminished|is unaffected/
+			wait_while { favor_before == $favor[:symbol] }
+			true
+		else
+			false
+		end
+	elsif symbol == 'need'
+		result = dothis 'symbol of need', /^You concentrate|^You strain/
+		if result =~ /^You concentrate/
+			wait_while { favor_before == $favor[:symbol] }
+			true
+		else
+			false
+		end
+	elsif symbol == 'supremacy'
+		result = dothis 'symbol of supremacy', /^You feel infused with a collective knowledge on the undead and their weaknesses|^You strain/
+		if result =~ /^You feel infused with a collective knowledge on the undead and their weaknesses/
+			wait_while { favor_before == $favor[:symbol] }
+			true
+		else
+			false
+		end
+	elsif symbol == 'transcendence'
+		result = dothis 'symbol of transcendence', /^You step into the space between the corporeal and ethereal realms|^You strain|^The bonds of the corporeal realm hold fast and you remain fully within its grasp\./
+		if result =~ /^You step into the space between the corporeal and ethereal realms/
+			wait_while { favor_before == $favor[:symbol] }
+			true
+		else
+			false
+		end
+	elsif symbol == 'return'
+		result = dothis 'symbol of return', /^Your surroundings blur|^You strain/
+		if result =~ /^Your surroundings blur/
+			wait_while { favor_before == $favor[:symbol] }
+			true
+		else
+			false
+		end
+	end
+}
+
+results = Hash.new
+
+before_dying { respond results.inspect }
+
+nil while use_symbol.call('supremacy')
+nil while use_symbol.call('courage')
+get_favor.call until use_symbol.call('thought') # avoid negative favor
+nil while use_symbol.call('thought')
+
+for symbol in [ 'blessing', 'courage', 'sleep', 'diminishment', 'need', 'supremacy', 'transcendence', 'return' ]
+
+	$favor[:symbol] = 0
+	measured_favor = 0
+
+	loop {
+		get_favor.call
+		measured_favor = $favor[:symbol]
+		break if use_symbol.call(symbol)
+	}
+
+	unless use_symbol.call('thought') # avoid negative favor
+		$favor[:symbol] = 0
+		more_measured_favor = 0
+		loop {
+			get_favor.call
+			more_measured_favor = $favor[:symbol]
+			break if use_symbol.call('thought')
+		}
+		measured_favor += more_measured_favor
+	end
+
+	thought_count = 1
+
+	thought_count += 1 while use_symbol.call('thought')
+
+	measured_favor -= thought_count
+	
+	results[symbol] = measured_favor
+
+	echo "symbol of #{symbol}: #{measured_favor}"
+
+end
+
+$favor[:symbol] = 0
+
+send_to_script 'lnet', "chat to alfred level #{XMLData.level}: #{results.inspect}"

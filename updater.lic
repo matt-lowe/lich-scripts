@@ -1,0 +1,472 @@
+=begin
+
+	This script updates Lich, the map database, and other random scripts from the repository.
+
+	tillmen@lichproject.org
+
+=end
+
+if $SAFE > 0
+	echo "This script needs to be trusted to work properly. (;trust #{script.name})"
+	exit
+end
+
+require 'uri'
+
+force_map = script.vars.find { |var| var =~ /forcemap/ }
+
+if XMLData.game =~ /^DR/
+	port = 7156
+else
+	port = 7153
+end
+
+get_lich_server = proc {
+	begin
+		lich_server = TCPSocket.open('216.224.171.85', port)
+	rescue
+		lich_server.close rescue()
+		lich_server = nil
+		echo "error connecting to server: #{$!}"
+	end
+	lich_server
+}
+
+repository_get = proc { |script_name,dir|
+	if lich_server = get_lich_server.call
+		lich_server.sync = true
+		lich_server.write('d')
+		lich_server.puts(script_name.sub(/\.[A-z]{1,3}$/, ''))
+		rsp = lich_server.gets.chomp
+		if rsp == "good"
+			fname = lich_server.gets.chomp
+			data = lich_server.readlines
+			File.open("#{dir}#{fname}", "w") { |file| file.puts(data.collect { |line| line.chomp }) }
+			lich_server.close
+			sleep 1
+			true
+		else
+			lich_server.close
+			sleep 1
+			false
+		end
+	else
+		nil
+	end
+}
+
+get_script_info = proc { |script_name|
+	if lich_server = get_lich_server.call
+		lich_server.sync = true
+		lich_server.write('v')
+		lich_server.puts(script_name)
+		info = lich_server.read
+		lich_server.close
+		sleep 1
+		info
+	else
+		String.new
+	end
+}
+
+remote_lich_version = remote_map_version = local_map_version = lich_update_available = map_update_available = nil
+get_versions = proc {
+	begin
+		site = TCPSocket.open('204.232.207.222', 80)
+		site.send("GET /updater/ HTTP/1.1\nHost: lichproject.org\nUser-Agent: Lich/#{$version} (en-US)\nAccept: text/html\nAccept-Language: en-us,en;q=0.5\nAccept-Encoding: none\nAccept-Charset: ISO-8859-1,utf-8;q=0.7,*;q=0.7\nKeep-Alive: 300\nConnection: close\n\n",0)
+		updater_index = site.read
+		site.close
+	rescue
+		updater_index = nil
+		echo "error: #{$!}"
+	end
+	if updater_index
+		remote_lich_version = updater_index.scan(/href="lich-[0-9\.]+\.rbw?"/).collect { |line| line.slice(/[0-9\.]+[0-9]+/).split('.').collect { |num| num.rjust(5, '0') }.join('.') }.sort.last
+		if remote_lich_version
+			lich_update_available = $version.split('.').collect { |num| num.rjust(5, '0') }.join('.') < remote_lich_version
+			remote_lich_version = remote_lich_version.split('.').collect { |num| num.to_i }.join('.')
+		end
+		if $version.split('.').collect { |num| num.rjust(5, '0') }.join('.') < '00004.00003.00000'
+			echo 'Your version of Lich is too old to use the latest map database.'
+			updater_map_index = nil
+		else
+			if XMLData.game =~ /^DR/
+				begin
+					site = TCPSocket.open('204.232.207.222', 80)
+					site.send("GET /updater/dr/ HTTP/1.1\nHost: lichproject.org\nUser-Agent: Lich/#{$version} (en-US)\nAccept: text/html\nAccept-Language: en-us,en;q=0.5\nAccept-Encoding: none\nAccept-Charset: ISO-8859-1,utf-8;q=0.7,*;q=0.7\nKeep-Alive: 300\nConnection: close\n\n",0)
+					updater_map_index = site.read
+				rescue
+					updater_map_index = nil
+					echo "error: #{$!}"
+				end
+			elsif XMLData.game =~ /^GS/
+				begin
+					site = TCPSocket.open('204.232.207.222', 80)
+					site.send("GET /updater/#{XMLData.game.downcase}/ HTTP/1.1\nHost: lichproject.org\nUser-Agent: Lich/#{$version} (en-US)\nAccept: text/html\nAccept-Language: en-us,en;q=0.5\nAccept-Encoding: none\nAccept-Charset: ISO-8859-1,utf-8;q=0.7,*;q=0.7\nKeep-Alive: 300\nConnection: close\n\n",0)
+					updater_map_index = site.read
+				rescue
+					updater_map_index = nil
+					echo "error: #{$!}"
+				end
+			else
+				updater_map_index = nil
+			end
+		end
+		if updater_map_index
+			local_map_version  = Dir.entries("#{$data_dir}#{XMLData.game}").find_all { |filename| filename =~ /^map\-[0-9]+\.dat$/ }.collect { |filename| filename.slice(/[0-9]+/) }.sort.last
+			remote_map_version = updater_map_index.scan(/href="map\-[0-9\.]+\.dat\.gz"/).collect { |line| line.slice(/[0-9]+/) }.sort.last
+			if local_map_version and remote_map_version
+				map_update_available = local_map_version < remote_map_version
+			elsif remote_map_version
+				map_update_available = true
+			end
+		else
+			remote_map_version = nil
+			map_update_available = false
+		end
+	end
+}
+
+find_updates = proc {
+	if lich_server = get_lich_server.call
+		lich_server.sync = true
+		lich_server.write('L')
+		updated_scripts = Array.new
+		while line = lich_server.gets
+			name,size,time = line.split(';;')
+			updated_scripts.push(name) if (Settings['scripts'].include?(name) or Settings['scripts'].include?(name.sub(/\.[A-z]{1,3}$/, ''))) and (!File.exists?("#{$script_dir}#{name}") or (time.to_i > (File.mtime("#{$script_dir}#{name}").to_i)))
+		end
+		lich_server.close
+		sleep 1
+		updated_scripts
+	else
+		nil
+	end
+}
+
+unless Settings['notfirst']
+	Settings['notfirst'] = true
+	Settings['scripts'] = [ 'updater', 'repository', 'lnet', 'infomon', 'spell-list.xml', 'go2', 'narost', 'gameobj-data.xml' ]
+	Settings['lich'] = true
+	Settings['map'] = true
+	sleep 2
+	respond
+	respond "This is apparently the first time you've run updater.lic"
+	respond
+	respond "These scripts have been added to your update list: #{Settings['scripts'].join(', ')}"
+	respond 'Lich has been set to update automatically.'
+	respond 'map.dat has been set to update automatically.'
+	respond
+	respond "If you'd like to change these settings, kill this script (#{$lich_char}k updater) and use ;updater help"
+	puts "Otherwise,#{monsterbold_start} unpause this script#{monsterbold_end} to continue. (#{$lich_char}u updater)"
+	respond
+	# fixme: reports of this freezing the game on Win8.  huh?
+	annoying_thread = Thread.new {
+		annoying = [ 55, "Hi!  This is the updater script!", 3, "I totally put a message on the screen for you.", 3, "Don't feel bad, everyone ignores my message.", 4, "I was just telling you that I wanted to update stuff.", 4, "You know, like the map database, map images, maybe some scripts.", 5, "If you don't mind, just type   ;unpause updater   ", 3, "Of course, if you're one of those paranoid types, you could type   ;kill updater   ", 6, "But then I would be dead...", 3, "Unable to update anything...", 5, "Until next time, of course!  ...since I'll be started each time you start Lich.", 6, "I guess you could type   ;favs delete updater   if you really hated me.", 5, "Then you could spend some quality time with your outdated scripts and map database.", 5, "That is, if you even have a map database..", 4, "Why do you hate me so much?", 4, "What have I ever done to you?", 11, "You still haven't unpaused me...", 8, "I know!  Maybe you forgot how!  I only told you twice.", 4, "They say the third time is the charm.", 4, "I'm not sure what that means...", 3, "I imagine it has something to do with voodoo.", 4, "Anyway, just type    ;unpause updater    ", 9, "Please... why won't you unpause me?", 10, "I'm totally paused here...", 90, "Alright.. it's no big deal.. I'm probably not even really paused..", 6, "I hate you!  Why are you doing this to me?!!", 6, "Come on man.. I'll do anything you want if you just unpause me.", 6, "I give up..  What's the point?", 6, "It'll be ok.  I'll just learn to live with being paused.", 90, "I'm so depressed...", 6, "My only purpose in this world is to update things, and you won't even let me do that..", 7, "I'm like an empath that can't heal people...", 3, "...a turtle that can't race rabbits..", 4, "What kind of life is that?" ]
+		annoying.each { |annoy| if annoy.class == String; $_CLIENT_.puts "\n[updater: #{annoy}]\n\n"; elsif annoy.class == Fixnum; sleep annoy; end }
+	}
+	pause_script
+	annoying_thread.kill
+end
+
+unless Settings['added-spell-list.xml']
+	Settings['added-spell-list.xml'] = true
+	Settings['scripts'].push('spell-list.xml') unless Settings['scripts'].include?('spell-list.xml')
+end
+
+if script.vars[1].downcase == 'update'
+	updated_scripts = find_updates.call
+	Settings['not_first_update'] = true
+	unless Settings['scripts'].empty?
+		if updated_scripts.include?('updater.lic') and ((Script.running.to_a + Script.hidden.to_a).find_all { |s| s.name == script.name }.length == 1)
+			if repository_get.call('updater', $script_dir)
+				echo "updated updater.lic"
+				force_start_script('updater', script.vars[1..-1].to_a)
+				wait_while { (Script.running.to_a + Script.hidden.to_a).find_all { |s| s.name == script.name }.length > 1 }
+				exit
+			else
+				echo "failed to update updater.lic"
+			end
+		end
+		updated_scripts.each { |us|
+			if (get_script_info.call(us) =~ /Required\:.*?Lich\s*v?([0-9]+\.[0-9]+\.[0-9]+)/i)
+				required_version = $1.split('.').collect { |num| num.rjust(5, '0') }.join('.')
+				if required_version > $version.split('.').collect { |num| num.rjust(5, '0') }.join('.')
+					echo "Skipping #{us} because your version of Lich is too old."
+					next
+				end
+			end
+			if repository_get.call(us, $script_dir)
+				echo "updated #{us}"
+				if us == 'lnet.lic' and running?('lnet')
+					kill_script 'lnet'
+					sleep 1
+					start_script 'lnet'
+				elsif (us == 'infomon.lic' or us == 'spell-list.xml' or us == 'spell-list.xml.txt') and running?('infomon')
+					kill_script 'infomon'
+					sleep 1
+					start_script 'infomon'
+				end
+
+			else
+				echo "failed to update #{us}"
+			end
+		}
+	end
+	if Settings['lich'] or Settings['map']
+		get_versions.call
+	end
+	if Settings['lich']
+		if $version.split.first < '4'
+			echo 'Your version of Lich is too old to be updated by this script.'
+			Settings['lich'] = false
+		elsif lich_update_available
+			begin
+				echo 'downloading lich.rb...'
+				site = TCPSocket.open('204.232.207.222', 80)
+				site.send("GET /updater/lich-#{remote_lich_version}.rb HTTP/1.1\nHost: lichproject.org\nUser-Agent: Lich/#{$version} (en-US)\nAccept: application/x-gzip,text/xml,application/xml,application/xhtml+xml,text/html;q=0.9,text/plain;q=0.8,image/png,*/*;q=0.5\nAccept-Language: en-us,en;q=0.5\nAccept-Encoding: none\nAccept-Charset: ISO-8859-1,utf-8;q=0.7,*;q=0.7\nKeep-Alive: 300\nConnection: close\n\n",0)
+				begin
+					line = site.gets
+					if line =~ /Content-Length: ([0-9]+)/
+						lich_size = $1.to_i
+					end
+				end until line =~ /^[\r\n]+$/
+				if lich_size < 100000
+					echo "file size too small (#{lich_size})... aborting"
+					site.close
+				else
+					lich_rb = site.read
+					site.close
+					if lich_size != lich_rb.length
+						echo 'file size does not match header... aborting'
+					else
+						if File.exists?("#{$lich_dir}lich.rb")
+							lich_ext = 'rb'
+						elsif File.exists?("#{$lich_dir}lich.rbw")
+							lich_ext = 'rbw'
+						else
+							echo "error: can't find lich.rb or lich.rbw"
+							exit
+						end
+						echo "backing up lich.#{lich_ext}..."
+						File.open("#{$lich_dir}lich.#{lich_ext}", 'r') { |infile| 
+							File.open("#{$temp_dir}lich-#{$version}.#{lich_ext}", 'w') { |outfile|
+								outfile.write(infile.read)
+							}
+						}
+						echo "writing lich.#{lich_ext}..."
+						File.open("#{$lich_dir}lich.#{lich_ext}", 'w') { |outfile| outfile.write(lich_rb) }
+						echo 'downloading live-update.rb'
+						site = TCPSocket.open('204.232.207.222', 80)
+						site.send("GET /updater/live-update.rb HTTP/1.1\nHost: lichproject.org\nUser-Agent: Lich/#{$version} (en-US)\nAccept: application/x-gzip,text/xml,application/xml,application/xhtml+xml,text/html;q=0.9,text/plain;q=0.8,image/png,*/*;q=0.5\nAccept-Language: en-us,en;q=0.5\nAccept-Encoding: none\nAccept-Charset: ISO-8859-1,utf-8;q=0.7,*;q=0.7\nKeep-Alive: 300\nConnection: close\n\n",0)
+						begin
+							line = site.gets
+							if line =~ /Content-Length: ([0-9]+)/
+								live_update_size = $1.to_i
+							end
+						end until line =~ /^[\r\n]+$/
+						if live_update_size < 200
+							echo "file size too small (#{live_update_size})... aborting."
+							site.close
+						else
+							live_update_rb = site.read
+							site.close
+							if live_update_size != live_update_rb.length
+								echo 'file size does not match header... aborting.'
+							else
+								echo 'running live_update.rb'
+								eval(live_update_rb)
+								if $version == remote_lich_version
+									echo "Lich has been updated to version #{$version}.  You do not need to restart Lich."
+								else
+									echo 'Lich will be updated when restarted.'
+								end
+							end
+						end
+					end
+				end
+			rescue
+				echo "error updating lich: #{$!}"
+			end
+		end
+	end
+	if Settings['map'] and map_update_available or (force_map and remote_map_version)
+		if $version.split('.').collect { |num| num.rjust(5, '0') }.join('.') < '00004.00002.00006'
+			echo 'not updating the map database because your version of Lich is too old'
+		else
+			begin
+				echo 'downloading map database...'
+				site = TCPSocket.open('204.232.207.222', 80)
+				if XMLData.game =~ /^DR/
+					site.send("GET /updater/dr/map-#{remote_map_version}.dat.gz HTTP/1.1\nHost: lichproject.org\nUser-Agent: Lich/#{$version} (en-US)\nAccept: application/x-gzip,text/xml,application/xml,application/xhtml+xml,text/html;q=0.9,text/plain;q=0.8,image/png,*/*;q=0.5\nAccept-Language: en-us,en;q=0.5\nAccept-Encoding: none\nAccept-Charset: ISO-8859-1,utf-8;q=0.7,*;q=0.7\nKeep-Alive: 300\nConnection: close\n\n",0)
+				else
+					site.send("GET /updater/#{XMLData.game.downcase}/map-#{remote_map_version}.dat.gz HTTP/1.1\nHost: lichproject.org\nUser-Agent: Lich/#{$version} (en-US)\nAccept: application/x-gzip,text/xml,application/xml,application/xhtml+xml,text/html;q=0.9,text/plain;q=0.8,image/png,*/*;q=0.5\nAccept-Language: en-us,en;q=0.5\nAccept-Encoding: none\nAccept-Charset: ISO-8859-1,utf-8;q=0.7,*;q=0.7\nKeep-Alive: 300\nConnection: close\n\n",0)
+				end
+				map_size = nil
+				while (line = site.gets) and line !~ /^[\r\n]+$/
+					map_size = $1.to_i if line =~ /Content-Length: ([0-9]+)/
+				end
+				gz_map_str = site.read
+				site.close
+				if map_size != gz_map_str.length
+					echo 'file size does not match header... aborting.'
+				else
+					if force_map
+						if (ver = Dir.entries("#{$data_dir}#{XMLData.game}").find_all { |n| n =~ /^map\-[0-9]+\.dat$/ }.collect { |n| n.slice(/[0-9]+/) }.sort.reverse.first) and (ver.to_i > Time.now.to_i)
+							filename = "#{$data_dir}#{XMLData.game}/map-#{ver.to_i + 1}.dat"
+						else
+							filename = "#{$data_dir}#{XMLData.game}/map-#{Time.now.to_i}.dat"
+						end
+					else
+						filename = "#{$data_dir}#{XMLData.game}/map-#{remote_map_version}.dat"
+					end
+					echo "writing map database to #{filename}..."
+					File.open(filename, 'wb') { |outfile|
+						gz_map_io = StringIO.new(gz_map_str)
+						reader = Zlib::GzipReader.new(gz_map_io)
+						while data = reader.read(8192)
+							outfile.write(data)
+						end
+						outfile.flush
+						outfile.fsync
+					}
+					GC.start
+					echo 'loading map database...'
+					Map.reload
+					echo 'map database has been updated'
+					if (old_dbs = Dir.entries("#{$data_dir}#{XMLData.game}").find_all { |n| n =~ /^map\-[0-9]+\.dat$/ }.sort) and (old_dbs.length > 3)
+						echo "deleting old map databases: #{old_dbs[0...-3].join(', ')}"
+						for filename in old_dbs[0...-3]
+							File.delete("#{$data_dir}#{XMLData.game}/#{filename}")
+						end
+					end
+				end
+			rescue
+				echo "failed to update map.dat. (#{$!})"
+				if $!.to_s =~ /buffer error/
+					echo 'this error was likely caused by a conflict with zlib, which is fixed in the updated Ruby installer at lichproject.org/download'
+				end
+				site.close rescue()
+			end
+			image_list = Array.new
+			Map.list.each { |room| image_list.push(room.map_name) unless room.map_name.nil? or image_list.include?(room.map_name) }
+			image_list.delete_if { |image_name| File.exists?("#{$lich_dir}maps/#{image_name}") }
+			Dir.mkdir("#{$lich_dir}maps") unless File.exists?("#{$lich_dir}maps")
+			image_list.each { |image_name|
+				begin
+					echo "downloading #{image_name}..."
+					site = TCPSocket.open('204.232.207.222', 80)
+					if XMLData.game =~ /^DR/
+						site.send("GET /updater/dr/#{URI.encode(image_name)} HTTP/1.1\nHost: lichproject.org\nUser-Agent: Lich/#{$version} (en-US)\nAccept: image/png,image/gif,image/jpg,*/*;q=0.5\nAccept-Language: en-us,en;q=0.5\nAccept-Encoding: none\nAccept-Charset: ISO-8859-1,utf-8;q=0.7,*;q=0.7\nKeep-Alive: 300\nConnection: close\n\n",0)
+					else
+						site.send("GET /updater/#{URI.encode(image_name)} HTTP/1.1\nHost: lichproject.org\nUser-Agent: Lich/#{$version} (en-US)\nAccept: image/png,image/gif,image/jpg,*/*;q=0.5\nAccept-Language: en-us,en;q=0.5\nAccept-Encoding: none\nAccept-Charset: ISO-8859-1,utf-8;q=0.7,*;q=0.7\nKeep-Alive: 300\nConnection: close\n\n",0)
+					end
+					data_size = nil
+					unless (line = site.gets) =~ /200 OK/
+						echo line
+						echo "warning: unexpected header... skipping #{image_name}"
+						next
+					end
+					while (line = site.gets) and line !~ /^[\r\n]+$/
+						data_size = $1.to_i if line =~ /Content-Length: ([0-9]+)/
+					end
+					data = site.read
+					site.close
+					if data_size != data.length
+						echo "warning: file size does not match header... skipping #{image_name}"
+						next
+					end
+					File.open("#{$lich_dir}maps/#{image_name}", 'wb') { |file| file.write(data) }
+				rescue
+					echo "error: #{$!}"
+				end
+			}
+		end
+	end
+elsif script.vars[1].downcase == 'check'
+	updated_scripts = find_updates.call
+	if Settings['lich'] or Settings['map']
+		get_versions.call
+	end
+	respond
+	if updated_scripts.empty?
+		respond "scripts are up-to-date (#{Settings['scripts'].length} scripts checked)"
+	else
+		respond "an update is available for these scripts: #{updated_scripts.join(', ')}"
+	end
+	if Settings['lich']
+		if lich_update_available
+			respond "an update for Lich is available (v#{remote_lich_version})"
+		else
+			respond "Lich is up-to-date"
+		end
+	end
+	if Settings['map']
+		if map_update_available
+			respond "an update for map.dat is available"
+		else
+			respond "map.dat is up-to-date"
+		end
+	end
+	respond
+elsif (script.vars[1].downcase == 'add') and script.vars[2]
+	if Settings['scripts'].include?(script.vars[2])
+		echo "#{script.vars[2]} is already on the update list"
+	else
+		Settings['scripts'].push(script.vars[2])
+		echo "added #{script.vars[2]} to the update list"
+	end
+elsif (script.vars[1] =~ /^rem(?:ove)$|^del(?:ete)?$/i) and script.vars[2]
+	if Settings['scripts'].delete(script.vars[2])
+		echo "deleted #{script.vars[2]} from the update list"
+	else
+		echo "#{script.vars[2]} was not found in the update list"
+	end
+elsif (script.vars[1].downcase == 'lich') and (script.vars[2] =~ /^on$|^off$/i)
+	if script.vars[2].downcase == 'on'
+		Settings['lich'] = true
+		echo "turning automatic updating of Lich on"
+	elsif script.vars[2].downcase == 'off'
+		Settings['lich'] = false
+		echo "turning automatic updating of Lich off"
+	end
+elsif (script.vars[1].downcase == 'map') and (script.vars[2] =~ /^on$|^off$/i)
+	if script.vars[2].downcase == 'on'
+		Settings['map'] = true
+		echo "turning automatic updating of map.dat on"
+	elsif script.vars[2].downcase == 'off'
+		Settings['map'] = false
+		echo "turning automatic updating of map.dat off"
+	end
+elsif script.vars[1].downcase == 'list'
+	respond
+	if Settings['scripts'].empty?
+		respond 'there are no scripts in the update list'
+	else
+		respond "these scripts are in the update list: #{Settings['scripts'].join(', ')}"
+	end
+	if Settings['lich'] == true
+		respond "Lich is set to be updated"
+	else
+		respond "Lich will not be updated"
+	end
+	if Settings['map'] == true
+		respond "map.dat is set to be updated"
+	else
+		respond "map.dat will not be updated"
+	end
+	respond
+else
+	respond
+	respond 'Usage:'
+	respond
+	respond "  #{$clean_lich_char}updater update"
+	respond "  #{$clean_lich_char}updater update forcemap"
+	respond "  #{$clean_lich_char}updater check"
+	respond "  #{$clean_lich_char}updater list"
+	respond "  #{$clean_lich_char}updater add <script name>"
+	respond "  #{$clean_lich_char}updater delete <script name>"
+	respond "  #{$clean_lich_char}updater lich <on/off>"
+	respond "  #{$clean_lich_char}updater map <on/off>"
+	respond
+end
