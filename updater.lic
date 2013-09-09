@@ -2,6 +2,7 @@
 
 	This script updates Lich, the map database, and other random scripts from the repository.
 
+	https://github.com/matt-lowe/lich-scripts
 	tillmen@lichproject.org
 
 =end
@@ -158,15 +159,19 @@ unless Settings['notfirst']
 	respond 'map.dat has been set to update automatically.'
 	respond
 	respond "If you'd like to change these settings, kill this script (#{$lich_char}k updater) and use ;updater help"
-	puts "Otherwise,#{monsterbold_start} unpause this script#{monsterbold_end} to continue. (#{$lich_char}u updater)"
+	if defined? _respond
+		_respond "Otherwise,#{monsterbold_start} unpause this script#{monsterbold_end} to continue. (#{$lich_char}u updater)"
+	else
+		puts "Otherwise,#{monsterbold_start} unpause this script#{monsterbold_end} to continue. (#{$lich_char}u updater)"
+	end
 	respond
-	# fixme: reports of this freezing the game on Win8.  huh?
-	annoying_thread = Thread.new {
-		annoying = [ 55, "Hi!  This is the updater script!", 3, "I totally put a message on the screen for you.", 3, "Don't feel bad, everyone ignores my message.", 4, "I was just telling you that I wanted to update stuff.", 4, "You know, like the map database, map images, maybe some scripts.", 5, "If you don't mind, just type   ;unpause updater   ", 3, "Of course, if you're one of those paranoid types, you could type   ;kill updater   ", 6, "But then I would be dead...", 3, "Unable to update anything...", 5, "Until next time, of course!  ...since I'll be started each time you start Lich.", 6, "I guess you could type   ;favs delete updater   if you really hated me.", 5, "Then you could spend some quality time with your outdated scripts and map database.", 5, "That is, if you even have a map database..", 4, "Why do you hate me so much?", 4, "What have I ever done to you?", 11, "You still haven't unpaused me...", 8, "I know!  Maybe you forgot how!  I only told you twice.", 4, "They say the third time is the charm.", 4, "I'm not sure what that means...", 3, "I imagine it has something to do with voodoo.", 4, "Anyway, just type    ;unpause updater    ", 9, "Please... why won't you unpause me?", 10, "I'm totally paused here...", 90, "Alright.. it's no big deal.. I'm probably not even really paused..", 6, "I hate you!  Why are you doing this to me?!!", 6, "Come on man.. I'll do anything you want if you just unpause me.", 6, "I give up..  What's the point?", 6, "It'll be ok.  I'll just learn to live with being paused.", 90, "I'm so depressed...", 6, "My only purpose in this world is to update things, and you won't even let me do that..", 7, "I'm like an empath that can't heal people...", 3, "...a turtle that can't race rabbits..", 4, "What kind of life is that?" ]
-		annoying.each { |annoy| if annoy.class == String; $_CLIENT_.puts "\n[updater: #{annoy}]\n\n"; elsif annoy.class == Fixnum; sleep annoy; end }
-	}
+#	# fixme: reports of this freezing the game on Win8.  huh?
+#	annoying_thread = Thread.new {
+#		annoying = [ 55, "Hi!  This is the updater script!", 3, "I totally put a message on the screen for you.", 3, "Don't feel bad, everyone ignores my message.", 4, "I was just telling you that I wanted to update stuff.", 4, "You know, like the map database, map images, maybe some scripts.", 5, "If you don't mind, just type   ;unpause updater   ", 3, "Of course, if you're one of those paranoid types, you could type   ;kill updater   ", 6, "But then I would be dead...", 3, "Unable to update anything...", 5, "Until next time, of course!  ...since I'll be started each time you start Lich.", 6, "I guess you could type   ;favs delete updater   if you really hated me.", 5, "Then you could spend some quality time with your outdated scripts and map database.", 5, "That is, if you even have a map database..", 4, "Why do you hate me so much?", 4, "What have I ever done to you?", 11, "You still haven't unpaused me...", 8, "I know!  Maybe you forgot how!  I only told you twice.", 4, "They say the third time is the charm.", 4, "I'm not sure what that means...", 3, "I imagine it has something to do with voodoo.", 4, "Anyway, just type    ;unpause updater    ", 9, "Please... why won't you unpause me?", 10, "I'm totally paused here...", 90, "Alright.. it's no big deal.. I'm probably not even really paused..", 6, "I hate you!  Why are you doing this to me?!!", 6, "Come on man.. I'll do anything you want if you just unpause me.", 6, "I give up..  What's the point?", 6, "It'll be ok.  I'll just learn to live with being paused.", 90, "I'm so depressed...", 6, "My only purpose in this world is to update things, and you won't even let me do that..", 7, "I'm like an empath that can't heal people...", 3, "...a turtle that can't race rabbits..", 4, "What kind of life is that?" ]
+#		annoying.each { |annoy| if annoy.class == String; $_CLIENT_.puts "\n[updater: #{annoy}]\n\n"; elsif annoy.class == Fixnum; sleep annoy; end }
+#	}
 	pause_script
-	annoying_thread.kill
+#	annoying_thread.kill
 end
 
 unless Settings['added-spell-list.xml']
