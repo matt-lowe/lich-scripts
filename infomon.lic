@@ -772,7 +772,7 @@ while line = get
 					break
 				end
 			end
-		elsif line =~ /^The (?:teller|dwarf) (?:carefully records the transaction,|scribbles the transaction into a book)(?: and)?(?:then )?(?: reluctantly)? hands you ([0-9]+)/
+		elsif line =~ /^The (?:teller|dwarf) (?:carefully records the transaction,|scribbles the transaction into a book)(?: and)?(?: then)?(?: reluctantly)? hands you ([0-9]+)/
 			for town,titles in bank_titles
 				if titles.include?(checkroom)
 					CharSettings['bank_accounts'][town] = CharSettings['bank_accounts'][town].to_i - $1.to_i
