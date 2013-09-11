@@ -2,6 +2,7 @@
 
 	This script loads alchemy recipes into memory for the alchemy script.
 
+	https://github.com/matt-lowe/lich-scripts
 	tillmen@lichproject.org
 
 =end
@@ -2675,7 +2676,7 @@ $alchemy_recipes = [
 	},
 	r = {
 		:product => 'some powdered gold nugget',
-		:steps   => [ "buy from Icemule wizard alchemy shop" ],
+		:steps   => [ "buy from Icemule Trace wizard alchemy shop" ],
 		:for     => [ 'Wizard' ],
 		:cost    => 800,
 	},
