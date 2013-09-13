@@ -8,6 +8,7 @@
 	Might heal your Adventurer's Guild escort. ( ;useherbs escort )
 	Will buy missing herbs. ( ;useherbs buy=on )
 
+	https://github.com/matt-lowe/lich-scripts
 	tillmen@lichproject.org
 
 =end
@@ -754,7 +755,7 @@ elsif script.vars[1].downcase == 'escort'
 			else
 				if herb = herb_container.contents.find { |i| known_herbs.find { |h| (h[:name] == i.name) and h[:type] == herb_type } }
 					stow_herb.call
-					get_result = dothistimeout "get ##{herb.id}", 5, /^You (?:carefully )?remove|^Get what\?|^You need a free hand for that\./
+					get_result = dothistimeout "get ##{herb.id}", 5, /^You (?:carefully )?remove|^You grab|^Get what\?|^You need a free hand for that\./
 					if get_result.nil? or (get_result =~ /^Get what\?/)
 						echo 'fixme 44235'
 						dothistimeout "close ##{herb_container.id}", 5, /^You close|^That is already closed\.$/ if close_herbsack
@@ -1001,7 +1002,7 @@ while herb_type = next_herb_type.call
 		if herb = herb_container.contents.find { |i| known_herbs.find { |h| (h[:name] == i.name) and h[:type] == herb_type } }
 			stow_herb.call
 			unless no_get and (herb.name !~ drinkable)
-				get_result = dothistimeout "get ##{herb.id}", 5, /^You (?:carefully )?remove|^Get what\?$|^Why don't you leave some for others\?$|^You need a free hand for that\.|^You need a free hand to pick that up\./
+				get_result = dothistimeout "get ##{herb.id}", 5, /^You (?:carefully )?remove|^You grab|^Get what\?$|^Why don't you leave some for others\?$|^You need a free hand for that\.|^You need a free hand to pick that up\./
 				if get_result.nil? or (get_result == 'Get what?') or (get_result == "Why don't you leave some for others?")
 					echo 'fixme 4'
 					exit
