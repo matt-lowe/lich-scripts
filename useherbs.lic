@@ -21,6 +21,7 @@ end
 # fixme: garland of sovyn cloves
 # fixme: skip more better
 # fixme: buy herbs/right hand full
+# fixme: use bank note
 
 known_herbs = [
 	{ :name=>"some acantha leaf",                :type=>"blood", :store_doses=>10 },
@@ -220,6 +221,41 @@ if script.vars[1].downcase == 'set'
 end
 =end
 
+withdraw = proc {
+	start_script 'go2', [ 'bank', '_disable_confirm_' ]
+	wait_while { running?('go2') }
+	fput 'unhide' if invisible?
+	if XMLData.room_title == '[Pinefar, Depository]'
+		if GameObj.npcs.any? { |npc| npc.noun == 'banker' }
+			fput "ask banker for #{[withdraw_amount.to_i, 20].max} silvers"
+				# The banker nods and says, "Alright, here ye go.  Ye understand I be takin' a little more than that from ye account in the 'Mule.  I don't works for free!"
+				# The banker looks at you suspiciously and says, "Hmm, I don't think ye be havin' enough in ye account to cover that and my fee.  Ye tryin' to pull one over on me?"
+		else
+			if icemule_bank = Room.list.find { |room| room.location == 'Icemule Trace' and room.tags.include?('bank') }
+				start_script 'go2', [ icemule_bank.id.to_s ]
+				wait_while { running?('go2') }
+				fput "withdraw #{withdraw_amount} silvers"
+				result = dothistimeout "withdraw #{withdraw_amount} silvers", 1, /debt collector/
+				if result =~ /debt collector/
+					fput "withdraw #{withdraw_amount} silvers"
+				end
+			else
+				echo 'waiting for banker...'
+				wait_until { GameObj.npcs.any? { |npc| npc.noun == 'banker' } }
+				fput "ask banker for #{[withdraw_amount.to_i, 20].max} silvers"
+			end
+		end
+	else
+		fput "withdraw #{withdraw_amount} silvers"
+		result = dothistimeout "withdraw #{withdraw_amount} silvers", 1, /debt collector/
+		if result =~ /debt collector/
+			fput "withdraw #{withdraw_amount} silvers"
+		end
+	end
+	silvers += withdraw_amount
+	deposit_silvers = true
+}
+
 too_wounded_to_cast = proc {
 	([Wounds.head, Scars.head, Wounds.nsys, Scars.nsys].max > 1) or ([Wounds.leftArm, Wounds.leftHand, Wounds.rightArm, Wounds.rightHand, Scars.leftArm, Scars.leftHand, Scars.rightArm, Scars.rightHand].max > 2) or ( ([Wounds.leftArm, Wounds.leftHand, Scars.leftArm, Scars.leftHand].max > 0) and ([Wounds.rightArm, Wounds.rightHand, Scars.leftArm, Scars.leftHand].max > 0) )
 }
@@ -381,16 +417,7 @@ buy_herb = proc { |herb_type|
 	if buy_result =~ /Sold for ([0-9]+) silver/
 		silvers -= $1.to_i
 	elsif buy_result =~ /^But you do not have enough silver!/
-		start_script 'go2', [ 'bank', '_disable_confirm_' ]
-		wait_while { running?('go2') }
-		fput 'unhide' if invisible?
-		# fixme: Pinefar bank is dumb
-		result = dothistimeout "withdraw #{withdraw_amount} silvers", 1, /debt collector/
-		if result =~ /debt collector/
-			fput "withdraw #{withdraw_amount} silvers"
-		end
-		silvers += withdraw_amount
-		deposit_silvers = true
+		withdraw.call
 		go_to_herbalist.call
 		redo
 	else
@@ -521,16 +548,7 @@ elsif script.vars[1].downcase == 'fill'
 		silvers = check_silvers.call
 	end
 	unless silvers > 4000
-		start_script 'go2', [ 'bank', '_disable_confirm_' ]
-		wait_while { running?('go2') }
-		fput 'unhide' if invisible?
-		# fixme: Pinefar bank is dumb
-		result = dothistimeout "withdraw #{withdraw_amount} silvers", 1, /debt collector/
-		if result =~ /debt collector/
-			fput "withdraw #{withdraw_amount} silvers"
-		end
-		silvers += withdraw_amount
-		deposit_silvers = true
+		withdraw.call
 	end
 	start_script 'go2', [ '325' ]
 	wait_while { running?('go2') }
@@ -548,16 +566,7 @@ elsif script.vars[1].downcase == 'fill'
 			if buy_result =~ /Sold for ([0-9]+) silver/
 				silvers -= $1.to_i
 			elsif buy_result =~ /^But you do not have enough silver!/
-				start_script 'go2', [ 'bank', '_disable_confirm_' ]
-				wait_while { running?('go2') }
-				fput 'unhide' if invisible?
-				# fixme: Pinefar bank is dumb
-				result = dothistimeout "withdraw #{withdraw_amount} silvers", 1, /debt collector/
-				if result =~ /debt collector/
-					fput "withdraw #{withdraw_amount} silvers"
-				end
-				silvers += withdraw_amount
-				deposit_silvers = true
+				withdraw.call
 				go_to_herbalist.call
 				redo
 			else
@@ -779,7 +788,9 @@ elsif script.vars[1].downcase == 'escort'
 		stow_herb.call
 		fill_right_hand
 	end
-	dothistimeout "close ##{herb_container.id}", 5, /^You close|^That is already closed\.$/ if close_herbsack
+	if close_herbsack
+		dothistimeout "close ##{herb_container.id}", 5, /^You close|^That is already closed\.$/
+	end
 	exit
 elsif script.vars[1].downcase == 'stock'
 	start_room = Room.current
@@ -863,7 +874,13 @@ elsif script.vars[1].downcase == 'stock'
 	if deposit_silvers
 		start_script('go2', ['bank','_disable_confirm_'])
 		wait_while { running?('go2') }
-		fput "deposit #{check_silvers.call}"
+		if XMLData.room_title == '[Pinefar, Depository]'
+			if GameObj.npcs.any? { |npc| npc.noun == 'banker' }
+				fput "give banker #{check_silvers.call} silvers"
+			end
+		else
+			fput "deposit #{check_silvers.call}"
+		end
 	end
 	unless Room.current.id == start_room.id
 		start_script 'go2', [ start_room.id.to_s ]
@@ -1021,16 +1038,7 @@ while herb_type = next_herb_type.call
 			silvers = check_silvers.call
 		end
 		unless silvers > 4000
-			start_script 'go2', [ 'bank', '_disable_confirm_' ]
-			wait_while { running?('go2') }
-			fput 'unhide' if invisible?
-			# fixme: Pinefar bank is dumb
-			result = dothistimeout 'withdraw 8000 silvers', 1, /debt collector/
-			if result =~ /debt collector/
-				fput 'withdraw 8000 silvers'
-			end
-			silvers += 8000
-			deposit_silvers = true
+			withdraw.call
 		end
 		unless Room.current.tags.include?('herbalist')
 			go_to_herbalist.call
@@ -1048,16 +1056,7 @@ while herb_type = next_herb_type.call
 		if buy_result =~ /Sold for ([0-9]+) silver/
 			silvers -= $1.to_i
 		elsif buy_result =~ /^But you do not have enough silver!/
-			start_script 'go2', [ 'bank', '_disable_confirm_' ]
-			wait_while { running?('go2') }
-			fput 'unhide' if invisible?
-			# fixme: Pinefar bank is dumb
-			result = dothistimeout 'withdraw 5000 silvers', 1, /debt collector/
-			if result =~ /debt collector/
-				fput 'withdraw 5000 silvers'
-			end
-			silvers += 5000
-			deposit_silvers = true
+			withdraw.call
 			go_to_herbalist.call
 			redo
 		else
