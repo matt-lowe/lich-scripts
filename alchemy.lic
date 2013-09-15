@@ -17,6 +17,7 @@
 # fixme: recast haste on armor hindrance
 # fixme: option to use symbol of dreams when waiting for spirit
 # fixme: pick the best npc to kill in travel range instead of the closest
+# fixme: wrong note when running to a different town to buy
 
 silence_me
 
@@ -2299,12 +2300,24 @@ buy_elusive = proc {
 				move way
 				if table = (GameObj.loot.to_a + GameObj.room_desc.to_a).find { |obj| obj.noun == 'table' }
 					count = Hash.new
-					dothistimeout "look on ##{table.id}", 3, /^On the .* you see/
-					unless table.contents.empty?
-						if table.contents.any? { |obj| obj.name =~ /#{UserVars.needed_reagents}/ }
+					script.want_downstream_xml = true
+					result = dothistimeout "look on ##{table.id}", 3, /^(?:<.*?>)?On the.*?you see/
+					script.want_downstream_xml = false
+					if table.contents.nil?
+						table_contents = Array.new
+						while str = results.sub(/^.*?you see /, '').slice!(/.*?<a.*?\/a>/)
+							if str.sub(/^(?:, | and )/, '') =~ /^(.*?)<a exist="(.*?)" noun="(.*?)">(.*?)<\/a>(.*)$/
+								table_contents.push GameObj.new($2, $3, $4, $1.strip, $5.strip)
+							end
+						end
+					else
+						table_contents = table.contents
+					end
+					unless table_contents.empty?
+						if table_contents.any? { |obj| obj.name =~ /#{UserVars.needed_reagents}/ }
 							empty_hands
 							dothistimeout "get ##{note.id}", 10, /^You remove|^You already have that\./
-							for obj in table.contents
+							for obj in table_contents
 								if obj.name =~ /#{UserVars.needed_reagents}/
 									unless count[obj.name]
 										count[obj.name] = all_sack_contents.call.find_all { |o| o.name == obj.name }.length
