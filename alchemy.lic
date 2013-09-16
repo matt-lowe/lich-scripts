@@ -2303,7 +2303,7 @@ buy_elusive = proc {
 					script.want_downstream_xml = true
 					result = dothistimeout "look on ##{table.id}", 3, /^(?:<.*?>)?On the.*?you see/
 					script.want_downstream_xml = false
-					if table.contents.nil?
+					if table.contents.empty?
 						table_contents = Array.new
 						while str = results.sub(/^.*?you see /, '').slice!(/.*?<a.*?\/a>/)
 							if str.sub(/^(?:, | and )/, '') =~ /^(.*?)<a exist="(.*?)" noun="(.*?)">(.*?)<\/a>(.*)$/
