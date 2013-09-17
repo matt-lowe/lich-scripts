@@ -234,7 +234,6 @@ withdraw = proc {
 			if icemule_bank = Room.list.find { |room| room.location == 'Icemule Trace' and room.tags.include?('bank') }
 				start_script 'go2', [ icemule_bank.id.to_s ]
 				wait_while { running?('go2') }
-				fput "withdraw #{withdraw_amount} silvers"
 				result = dothistimeout "withdraw #{withdraw_amount} silvers", 1, /debt collector/
 				if result =~ /debt collector/
 					fput "withdraw #{withdraw_amount} silvers"
@@ -246,7 +245,6 @@ withdraw = proc {
 			end
 		end
 	else
-		fput "withdraw #{withdraw_amount} silvers"
 		result = dothistimeout "withdraw #{withdraw_amount} silvers", 1, /debt collector/
 		if result =~ /debt collector/
 			fput "withdraw #{withdraw_amount} silvers"
