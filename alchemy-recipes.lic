@@ -3271,6 +3271,7 @@ $alchemy_recipes = [
 	r = { :product => 'wild beechnut',            :steps => [ 'forage' ] },
 	r = { :product => 'pine cone',                :steps => [ 'forage' ] },
 	r = { :product => 'pink hydrangea',           :steps => [ 'forage' ] },
+	r = { :product => 'heath aster',              :steps => [ 'forage' ] },
 	r = { :product => 'wild orchid',                :steps => [ 'forage' ] },
 	r = { :product => 'wild pansy blossom',         :steps => [ 'forage' ] },
 	r = { :product => 'small dandelion',            :steps => [ 'forage' ] },
