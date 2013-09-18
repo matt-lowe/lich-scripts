@@ -2309,7 +2309,8 @@ buy_elusive = proc {
 					script.want_downstream_xml = false
 					if table.contents.empty?
 						table_contents = Array.new
-						while str = result.sub(/^.*?you see /, '').slice!(/.*?<a.*?\/a>/)
+						results = result.sub(/^.*?you see /, '')
+						while str = results.slice!(/.*?<a.*?\/a>/)
 							if str.sub(/^(?:, | and )/, '') =~ /^(.*?)<a exist="(.*?)" noun="(.*?)">(.*?)<\/a>(.*)$/
 								table_contents.push GameObj.new($2, $3, $4, $1.strip, $5.strip)
 							end
