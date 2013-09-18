@@ -1131,7 +1131,11 @@ show_check = proc { |check_info|
 		}
 	end
 	output.concat "\ncost: #{check_info[:cost]}, time: #{(check_info[:time]/60.0).as_time}\n\n"
-	$stdout.puts output rescue()
+	if defined?(_respond)
+		_respond output
+	else
+		$stdout.puts output rescue()
+	end
 }
 
 do_steps = proc { |steps|
@@ -1225,7 +1229,7 @@ do_steps = proc { |steps|
 					haste = Spell[506]
 					haste.cast if haste.known? and haste.affordable? and not haste.active?
 					waitrt?
-					grind_result = dothis "grind #{ingredient.noun} from my mortar", /^Roundtime. [0-9]+ sec\.$|appears to be as ground as its going to get|^Grind what|^With what do you intend to grind/
+					grind_result = dothis "grind #{ingredient.noun} from my mortar", /^Roundtime. [0-9]+ sec\.$|appears to be as ground as it'?s going to get|^Grind what|^With what do you intend to grind/
 					waitrt?
 					if grind_result =~ /^With what do you intend to grind/
 						unless pestle = all_sack_contents.call.find { |obj| obj.noun == 'pestle' }
@@ -1234,7 +1238,7 @@ do_steps = proc { |steps|
 							break
 						end
 						dothis "_drag ##{pestle.id} ##{mortar.id}", /^You put|^I could not find what you were referring to\./
-					elsif grind_result =~ /appears to be as ground as its going to get|^Grind what/
+					elsif grind_result =~ /appears to be as ground as it'?s going to get|^Grind what/
 						break
 					end
 				}
@@ -1986,9 +1990,9 @@ do_task_grind = proc {
 			if get_result
 				loop {			
 					haste.cast if haste.known? and haste.affordable? and not haste.active?
-					grind_result = dothistimeout "grind my #{grindable_noun}", 10, /^You take the stone pestle into your free hand and grind|ground as much as possible|^Grind what/
+					grind_result = dothistimeout "grind my #{grindable_noun}", 10, /^You take the stone pestle into your free hand and grind|ground as much as possible|as ground as it'?s going to get|^Grind what/
 					waitrt?
-					break if grind_result =~ /ground as much as possible|^Grind what/
+					break if grind_result =~ /ground as much as possible|as ground as it'?s going to get|^Grind what/
 				}
 			end
 			give_result = dothistimeout "give my mortar to #{clerk}", 10, /^\[You have/
@@ -2043,7 +2047,7 @@ do_task_grind_mine = proc {
 		if got_crap
 			do_steps.call(check_info[:steps])
 			$alchemy_grind_history[check_info[:recipe_count].keys.first] = Time.now
-			result = reget.reverse.find { |line| line =~ /^\[You have|as ground as its going to get/ }
+			result = reget.reverse.find { |line| line =~ /^\[You have|as ground as it'?s going to get/ }
 			break unless result =~ /remaining/
 		end
 	end
@@ -2493,7 +2497,11 @@ elsif script.vars[1].downcase == 'suggest'
 		end
 	end
 	output.concat "\n"
-	$stdout.puts output rescue()
+	if defined?(_respond)
+		_respond output
+	else
+		$stdout.puts output rescue()
+	end
 	close_sacks.call
 elsif script.vars[1] =~ /^(check|make|prepare)$/i and not script.vars[2].nil?
 	if $1.downcase == 'check'
