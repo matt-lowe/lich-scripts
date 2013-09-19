@@ -51,7 +51,7 @@
 		<noun>^(?:lockpick)$</noun>
 	</type>
 	<type name="magic">
-		<name>^(?:crystal amulet|gold\-framed clear crystal lens|dull gold coin|white flask|impure potion|pure potion|small glowing vial|grot t'kel potion|dirtokh potion|ayveneh potion)$</name>
+		<name>^(?:crystal amulet|gold\-framed clear crystal lens|dull gold coin|white flask|impure potion|pure potion|small glowing vial|grot t'kel potion|dirtokh potion|ayveneh potion)$|(?:light violet|emerald|reddish-brown|wavering|icy blue|stone grey|amethyst|dark red) sphere$</name>
 		<noun>^(?:crystal|statue|filings|triangle|granules|square|cube|sculpture|figurine|prism|statuette|orb|statuette|miniature)$</noun>
 		<exclude>^(?:murky shadowglass orb|chalky yellow cube|glaesine crystal|shard of tigerfang crystal|dark glimmering crystal|dark translucent crystal|diaphanous eight\-sided crystal|rock crystal|quartz crystal|ayanad crystal|s'ayanad crystal|t'ayanad crystal|n'ayanad crystal|golden firemote orb|small crystal flask)$</exclude>
 	</type>
@@ -100,6 +100,13 @@
 	</type>
 	<type name="grimswarm">
 		<name>^(?:seasoned |grizzled |battle\-scarred |weathered |veteran |hulking |haggard )?Grimswarm (?:veteran|warmonger|spellbinder|giant|troll|orc) (?:healer|empath|sniper|crusader|warlock|champion|huntmaster|warmage|soldier|sorcerer|sorceress|ranger|warrior|elementalist|mage|wizard|raider|acolyte|guard|paladin|battlemage|archer|skirmisher|scout|shaman|warchief|pillager|marauder|cleric|initiate|dissembler|barbarian|fighter|scourge|hunter|destroyer|witch|wrathbringer|adept|zealot|huntmistress)$</name>
+	</type>
+	<type name="lm trap">
+		<name>^(?:green-tinted|thick glass|clear glass) vial|steel needle$|steel jaws$|(?:light violet|emerald|reddish-brown|wavering|icy blue|stone grey|amethyst|dark red) sphere$|dark crystal$</name>
+	</type>
+	<type name="lm tool">
+		<name>^(?:superior|strong|solid|warped|thin|brittle) wooden wedge$</name>
+		<noun>calipers$</noun>
 	</type>
 	<sellable name="consignment">
 		<name>^(?:slender mithril wand|jagged brown crystal|slender crimson rod|wavy grey crystal wand|shadowy dark crystal wand|greater mana regeneration potion|greater mana\-well potion|glowing moonstone talisman|dark translucent crystal|diaphanous eight\-sided crystal|mottled malachite talisman|ayanad crystal|s'ayanad crystal|t'ayanad crystal|n'ayanad crystal|glimmering blue essence shard|glowing violet essence shard|some essence of earth|some essence of air|small troll tooth|large troll tooth|some essence of fire|some glimmering blue essence dust|some glowing violet essence dust|radiant crimson essence shard|perfect myklian belly scale|slender azure rod|crystalline globe|hazy glass vial|clear potion|some essence of water|glowing brilliant silver potion|silvery potion|elemental core|crystal core|pristine nymph's hair|pristine siren's hair|tiny golden seed|vial of farlook vitreous humor|greater mana potion|lesser mana\-well potion|lesser mana regeneration potion|inky necrotic core|some radiant crimson essence dust|glowing violet mote of essence|glimmering blue mote of essence|radiant crimson mote of essence|dark murky potion|pristine sprite's hair)$</name>
