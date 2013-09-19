@@ -2007,7 +2007,7 @@
       <message type='start'>You feel a surge of energy shoot through you!</message>
    </spell>
    <spell availability='self-cast' name='Council Task' number='9011' type='timer'>
-      <duration persist-on-death='yes'>if defined?(line) and line.slice(/[0-9]+/).to_f > 0; line.slice(/[0-9]+/).to_f; else; 30; end</duration>
+      <duration persist-on-death='yes' real-time='yes'>if defined?(line) and line.slice(/[0-9]+/).to_f > 0; line.slice(/[0-9]+/).to_f; else; 30; end</duration>
       <message type='start'>The High Taskmaster looks at you, consults her notes, and then announces in a loud voice: &quot;[A-Z][a-z]+, I&apos;m rather busy right now\.  I know you have completed the requirements for advancement in rank, but I cannot take the time to instruct you\.  Let me check my schedule\.\.\. Ah, yes, I can squeeze you in in [0-9]+ minutes or so\.  Come back then and I&apos;ll take care of you\.&quot;</message>
    </spell>
    <spell availability='self-cast' name='Council Punishment' number='9012' type='timer'>
