@@ -1168,7 +1168,7 @@ while line = get
 					spell.timeleft = timeleft
 					respond "[ #{spell.name}: +#{timeleft.as_time}, #{spell.remaining} remaining. ]" if CharSettings['show_messages']
 				end
-			elsif (spell.num.to_i >= 9000) or (spell.num.to_i == 725)
+			elsif (spell.num.to_i >= 9000 and spell.num.to_i != 9011) or (spell.num.to_i == 725)
 				spell.putup
 				respond "[ #{spell.name}: +#{spell.time_per.as_time}, #{spell.remaining} remaining. ]" if CharSettings['show_messages']
 			else
