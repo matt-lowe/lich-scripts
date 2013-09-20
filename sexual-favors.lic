@@ -12,7 +12,7 @@
 	Type "favor set <amount>" to set symbol favor to something else.
 	Touch the globe to raise or lower symbol favor to the correct range.
 
-	Favor costs are accurate for levels 3 through 38, and 100.  The other levels
+	Favor costs are accurate for levels 3 through 40, and 100.  The other levels
 	are guessed, but won't be too far off.  Still working on getting them perfect.
 	You can help by running	the measure-favor script.
 
@@ -30,6 +30,7 @@
 	out which blessing cost to use.  It's only looking for a magical metal or wood
 	in the weapon name.  If it's wrong, let me know and I'll try to fix it.
 
+	https://github.com/matt-lowe/lich-scripts
 	tillmen@lichproject.org
 
 =end
@@ -243,7 +244,7 @@ add_commas = proc { |num|
 }
 
 globe_offset = proc {
-	if XMLData.level > 38 and XMLData.level < 100
+	if XMLData.level > 40 and XMLData.level < 100
 		guessed_globe = true
 	else
 		guessed_globe = false
@@ -252,7 +253,7 @@ globe_offset = proc {
 }
 
 subtract_favor = proc { |symbol_factor|
-	if XMLData.level > 38 and XMLData.level < 100
+	if XMLData.level > 40 and XMLData.level < 100
 		guessed_str = ' (guessed)'
 	else
 		guessed_str = String.new
@@ -698,7 +699,7 @@ while (line = get)
 	elsif line =~ /^The (?:<.*?>)?globe(?:<.*?>)? feels cold beneath your touch\./
 		high = 999 - globe_offset.call
 		low = 0
-		echo "0 revolutions = 0 to #{high} favor#{' (+/- 16)' if guessed_globe}"
+		echo "0 revolutions = 0 to #{high} favor#{' (+/- 15)' if guessed_globe}"
 		if globe_sets_favor
 			if $favor[:symbol] > high
 				diff = $favor[:symbol] - high
@@ -713,7 +714,7 @@ while (line = get)
 	elsif line =~ /^The (?:<.*?>)?globe(?:<.*?>)? hums and turns slowly once under your fingers\./
 		high = 1999 - globe_offset.call
 		low = 1000 - globe_offset.call
-		echo "1 revolution = #{add_commas.call(low)} to #{add_commas.call(high)} favor#{' (+/- 16)' if guessed_globe}"
+		echo "1 revolution = #{add_commas.call(low)} to #{add_commas.call(high)} favor#{' (+/- 15)' if guessed_globe}"
 		if globe_sets_favor
 			if $favor[:symbol] > high
 				diff = $favor[:symbol] - high
@@ -737,7 +738,7 @@ while (line = get)
 			high = (count*1000) + 49999 - globe_offset.call
 			low = (count*1000) - globe_offset.call
 		end
-		echo "#{count} revolutions = #{add_commas.call(low)} to #{add_commas.call(high)} favor#{' (+/- 16)' if guessed_globe}"
+		echo "#{count} revolutions = #{add_commas.call(low)} to #{add_commas.call(high)} favor#{' (+/- 15)' if guessed_globe}"
 		if globe_sets_favor
 			if $favor[:symbol] > high
 				diff = $favor[:symbol] - high
@@ -896,6 +897,14 @@ end
 	     0-   993	The globe feels cold beneath your touch.
 	   994-  1993	The globe hums and turns slowly once under your fingers.
 	  1994-      	You try to count the number of spins and are certain it was 2 revolutions.
+
+	- level 39-40 globe -
+
+	    favor		message
+	    -----		-------
+	     0-   992	The globe feels cold beneath your touch.
+	   993-  1992	The globe hums and turns slowly once under your fingers.
+	  1993-      	You try to count the number of spins and are certain it was 2 revolutions.
 
 =end
 
@@ -1391,6 +1400,30 @@ end
 	sym transen = 409 favor
 	sym return  = 682 favor
 
+	- level 39 -
+
+	sym bless   =  29 favor
+	sym courage =  71 favor
+	sym sleep   = 141 favor
+	sym dimin   = 212 favor
+	sym need    = 282 favor
+	sym suprem  = 353 favor
+	sym transen = 423 favor
+	sym return  = 705 favor
+
+	- level 40 -
+
+	sym bless   =  30 favor
+	sym courage =  73 favor
+	sym sleep   = 146 favor
+	sym dimin   = 219 favor
+	sym need    = 291 favor
+	sym suprem  = 364 favor
+	sym transen = 437 favor
+	sym return  = 728 favor
+
+
+
 =end
 
 
@@ -1439,8 +1472,5 @@ get_fame_change = proc {
 		change
 	end
 }
-
-level_factor = [ nil, nil, nil, 37, 65, 95, 129, 167, 209, 253, 300, 350, 400, 453, 506, 562, 619, 676, 736, 796, 856, 919, 982, 1045, 1109, 1173, 1237, 1302, 1367, 1433, 1500, 1567, 1634, 1694, 1760, 1826, 1893, 1960, 2027, 2094, 2162, 2230, 2298, 2366, 2435, 2505, 2575, 2645, 2715, 2785, 2856, 2927, 2998, 3069, 3140, 3212, 3284, 3356, 3428, 3500, 3572, 3644, 3716, 3789, 3862, 3935, 4008, 4081, 4154, 4227, 4301, 4375, 4449, 4523, 4597, 4671, 4745, 4819, 4893, 4967, 5041, 5115, 5189, 5263, 5337, 5411, 5485, 5559, 5633, 5707, 5781, 5855, 5929, 6003, 6077, 6151, 6225, 6299, 6373, 6447, 6521 ]
-cost = (level_factor[XMLData.level] / 30.0 * symbol_factor).ceil
 
 =end
