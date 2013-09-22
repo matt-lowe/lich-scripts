@@ -1170,7 +1170,14 @@ while line = get
 				end
 			elsif (spell.num.to_i >= 9000 and spell.num.to_i != 9011) or (spell.num.to_i == 725)
 				spell.putup
-				respond "[ #{spell.name}: +#{spell.time_per.as_time}, #{spell.remaining} remaining. ]" if CharSettings['show_messages']
+                respond "[ #{spell.name}: +#{spell.time_per.as_time}, #{spell.remaining} remaining. ]" if CharSettings['show_messages']
+                
+                # Assume Aspect cooldowns
+                if spell.num.to_i > 9013 and spell.num.to_i < 9042
+					cooldown_spell = Spell[spell.num+1]
+					cooldown_spell.putup
+					respond "[ #{cooldown_spell.name}: +#{cooldown_spell.timeleft.as_time}, #{cooldown_spell.remaining} remaining. ]" if CharSettings['show_messages']
+				end
 			else
 				if caster == 'self'
 					if self_invoke
@@ -1241,11 +1248,6 @@ while line = get
 				else
 					spell.putup(options)
 					respond "[ #{spell.name}: +#{spell.time_per(options).as_time}, #{spell.remaining} remaining. ]" if CharSettings['show_messages']
-				end
-				if spell.num.to_i > 9013 and spell.num.to_i < 9042
-					cooldown_spell = Spell[spell.num+1]
-					cooldown_spell.putup
-					respond "[ #{cooldown_spell.name}: +#{cooldown_spell.timeleft.as_time}, #{cooldown_spell.remaining} remaining. ]" if CharSettings['show_messages']
 				end
 			end
 		elsif line =~ spell_dn_msgs_re
