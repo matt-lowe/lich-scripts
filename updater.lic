@@ -73,7 +73,7 @@ get_script_info = proc { |script_name|
 remote_lich_version = remote_map_version = local_map_version = lich_update_available = map_update_available = nil
 get_versions = proc {
 	begin
-		site = TCPSocket.open('204.232.207.222', 80)
+		site = TCPSocket.open('lichproject.org', 80)
 		site.send("GET /updater/ HTTP/1.1\nHost: lichproject.org\nUser-Agent: Lich/#{$version} (en-US)\nAccept: text/html\nAccept-Language: en-us,en;q=0.5\nAccept-Encoding: none\nAccept-Charset: ISO-8859-1,utf-8;q=0.7,*;q=0.7\nKeep-Alive: 300\nConnection: close\n\n",0)
 		updater_index = site.read
 		site.close
@@ -93,7 +93,7 @@ get_versions = proc {
 		else
 			if XMLData.game =~ /^DR/
 				begin
-					site = TCPSocket.open('204.232.207.222', 80)
+					site = TCPSocket.open('lichproject.org', 80)
 					site.send("GET /updater/dr/ HTTP/1.1\nHost: lichproject.org\nUser-Agent: Lich/#{$version} (en-US)\nAccept: text/html\nAccept-Language: en-us,en;q=0.5\nAccept-Encoding: none\nAccept-Charset: ISO-8859-1,utf-8;q=0.7,*;q=0.7\nKeep-Alive: 300\nConnection: close\n\n",0)
 					updater_map_index = site.read
 				rescue
@@ -102,7 +102,7 @@ get_versions = proc {
 				end
 			elsif XMLData.game =~ /^GS/
 				begin
-					site = TCPSocket.open('204.232.207.222', 80)
+					site = TCPSocket.open('lichproject.org', 80)
 					site.send("GET /updater/#{XMLData.game.downcase}/ HTTP/1.1\nHost: lichproject.org\nUser-Agent: Lich/#{$version} (en-US)\nAccept: text/html\nAccept-Language: en-us,en;q=0.5\nAccept-Encoding: none\nAccept-Charset: ISO-8859-1,utf-8;q=0.7,*;q=0.7\nKeep-Alive: 300\nConnection: close\n\n",0)
 					updater_map_index = site.read
 				rescue
@@ -228,7 +228,7 @@ if script.vars[1].downcase == 'update'
 		elsif lich_update_available
 			begin
 				echo 'downloading lich.rb...'
-				site = TCPSocket.open('204.232.207.222', 80)
+				site = TCPSocket.open('lichproject.org', 80)
 				site.send("GET /updater/lich-#{remote_lich_version}.rb HTTP/1.1\nHost: lichproject.org\nUser-Agent: Lich/#{$version} (en-US)\nAccept: application/x-gzip,text/xml,application/xml,application/xhtml+xml,text/html;q=0.9,text/plain;q=0.8,image/png,*/*;q=0.5\nAccept-Language: en-us,en;q=0.5\nAccept-Encoding: none\nAccept-Charset: ISO-8859-1,utf-8;q=0.7,*;q=0.7\nKeep-Alive: 300\nConnection: close\n\n",0)
 				begin
 					line = site.gets
@@ -262,7 +262,7 @@ if script.vars[1].downcase == 'update'
 						echo "writing lich.#{lich_ext}..."
 						File.open("#{$lich_dir}lich.#{lich_ext}", 'w') { |outfile| outfile.write(lich_rb) }
 						echo 'downloading live-update.rb'
-						site = TCPSocket.open('204.232.207.222', 80)
+						site = TCPSocket.open('lichproject.org', 80)
 						site.send("GET /updater/live-update.rb HTTP/1.1\nHost: lichproject.org\nUser-Agent: Lich/#{$version} (en-US)\nAccept: application/x-gzip,text/xml,application/xml,application/xhtml+xml,text/html;q=0.9,text/plain;q=0.8,image/png,*/*;q=0.5\nAccept-Language: en-us,en;q=0.5\nAccept-Encoding: none\nAccept-Charset: ISO-8859-1,utf-8;q=0.7,*;q=0.7\nKeep-Alive: 300\nConnection: close\n\n",0)
 						begin
 							line = site.gets
@@ -301,7 +301,7 @@ if script.vars[1].downcase == 'update'
 		else
 			begin
 				echo 'downloading map database...'
-				site = TCPSocket.open('204.232.207.222', 80)
+				site = TCPSocket.open('lichproject.org', 80)
 				if XMLData.game =~ /^DR/
 					site.send("GET /updater/dr/map-#{remote_map_version}.dat.gz HTTP/1.1\nHost: lichproject.org\nUser-Agent: Lich/#{$version} (en-US)\nAccept: application/x-gzip,text/xml,application/xml,application/xhtml+xml,text/html;q=0.9,text/plain;q=0.8,image/png,*/*;q=0.5\nAccept-Language: en-us,en;q=0.5\nAccept-Encoding: none\nAccept-Charset: ISO-8859-1,utf-8;q=0.7,*;q=0.7\nKeep-Alive: 300\nConnection: close\n\n",0)
 				else
@@ -360,7 +360,7 @@ if script.vars[1].downcase == 'update'
 			image_list.each { |image_name|
 				begin
 					echo "downloading #{image_name}..."
-					site = TCPSocket.open('204.232.207.222', 80)
+					site = TCPSocket.open('lichproject.org', 80)
 					if XMLData.game =~ /^DR/
 						site.send("GET /updater/dr/#{URI.encode(image_name)} HTTP/1.1\nHost: lichproject.org\nUser-Agent: Lich/#{$version} (en-US)\nAccept: image/png,image/gif,image/jpg,*/*;q=0.5\nAccept-Language: en-us,en;q=0.5\nAccept-Encoding: none\nAccept-Charset: ISO-8859-1,utf-8;q=0.7,*;q=0.7\nKeep-Alive: 300\nConnection: close\n\n",0)
 					else
