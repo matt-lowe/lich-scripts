@@ -796,7 +796,7 @@ $alchemy_recipes = [
 	},
 	r = {
 		:product => 'minor heath-well potion',
-		:steps   => [ 'light', 'add flask of clear water', 'add some powdered golden amber', 'add some powdered golden amber', 'add small troll tooth', 'add small troll tooth', 'boil', 'add ayana leaf', 'add red bear paw', 'simmer', 'seal' ],
+		:steps   => [ 'light', 'add flask of clear water', 'add some powdered golden amber', 'add some powdered golden amber', 'add small troll tooth', 'add small troll tooth', 'boil', 'add ayana leaf', 'add bear paw', 'simmer', 'seal' ],
 		:type    => 'potions',
 		:rank    => [ 11, 21 ],
 		:for     => [ 'Empath' ],
@@ -812,7 +812,7 @@ $alchemy_recipes = [
 	r = {
 		:product => 'foamy dark amber elixir',
 		:nick    => 'minor health-well potion',
-		:steps   => [ 'light', 'add flask of clear water', 'add some powdered golden amber', 'add some powdered golden amber', 'add small troll tooth', 'add small troll tooth', 'boil', 'add ayana leaf', 'add red bear paw', 'simmer', 'seal' ],
+		:steps   => [ 'light', 'add flask of clear water', 'add some powdered golden amber', 'add some powdered golden amber', 'add small troll tooth', 'add small troll tooth', 'boil', 'add ayana leaf', 'add bear paw', 'simmer', 'seal' ],
 		:type    => 'potions',
 		:rank    => [ 10, 21 ],
 		:for     => [ 'Empath' ],
@@ -3224,7 +3224,7 @@ $alchemy_recipes = [
 	r = { :product => 'pink rain lily',           :steps => [ 'forage' ] },
 	r = { :product => 'stick',                    :steps => [ 'forage' ] },
 	r = { :product => 'sprig of holly',           :steps => [ 'forage' ] },
-	r = { :product => 'white hook mushroom',      :steps => [ 'forage' ] },
+	r = { :product => 'white hook mushroom',      :steps => [ 'forage' ] }, # fixme: can only forage at night
 	r = { :product => 'blue poppy',               :steps => [ 'forage' ] },
 	r = { :product => 'yellow passionflower',     :steps => [ 'forage' ] },
 	r = { :product => 'sprig of wild lilac',      :steps => [ 'forage' ] },
@@ -3309,7 +3309,7 @@ $alchemy_recipes = [
 	r = { :product => 'cockatrice plume',             :steps => [ 'kill plumed cockatrice' ],   },
 	r = { :product => 'wight skin',                   :steps => [ 'kill arch wight' ],          },
 	r = { :product => 'ghoul nail',                   :steps => [ 'kill lesser ghoul' ],        },
-	r = { :product => 'red bear paw',                 :steps => [ 'kill red bear' ],            },
+	r = { :product => 'bear paw',                     :steps => [ 'kill red bear' ],            },
 	r = { :product => 'wraith talon',                 :steps => [ 'kill wraith' ],              },
 	r = { :product => 'ghoul finger',                 :steps => [ 'kill ghoul master' ],        },
 	r = { :product => 'mist wraith eye',              :steps => [ 'kill mist wraith' ],         },
