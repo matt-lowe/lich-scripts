@@ -24,8 +24,6 @@
 	only for attacks that the script knows about.  If you land the killing blow and
 	the script reports it as spectator favor, send me a log of it and I'll fix it.
 
-	Favor needed to step is accurate only for level 3.  Other levels are estimated.
-
 	The script will check the weapon name when you use symbol of blessing to figure
 	out which blessing cost to use.  It's only looking for a magical metal or wood
 	in the weapon name.  If it's wrong, let me know and I'll try to fix it.
@@ -265,8 +263,9 @@ subtract_favor = proc { |symbol_factor|
 
 favor_to_step = proc {
 	# (Society.rank*100)+((Society.rank/3.0).ceil*15) # formula for level 3
-	# ((Society.rank*(100/3.0)*XMLData.level).ceil)+((Society.rank/3.0).ceil*(XMLData.level-2)*15) # couldn't possibly be right
-	(Society.rank*100)+((Society.rank/3.0).ceil*(XMLData.level*1.291)**2).floor # probably sucks
+	# (Society.rank*100)+((Society.rank/3.0).ceil*(XMLData.level*1.291)**2).floor # good for level 3 and 40
+
+	(Society.rank*100) + (((XMLData.level**2)*(((Society.rank+2)/3)*5))/3)
 }
 
 fix_name = proc { |name|
@@ -328,7 +327,11 @@ while (line = get)
 	# fixme: open implode
 	if line =~ /^The glow fades from .*?exist="(.*?)"/
 		banshee_defence.delete($1)
-	elsif (line =~ /You (?:swing|gesture|sing|weave another verse|continue to sing|channel|fire|wave|tap|rub|hurl|thrust|slash|throw|punch|attempt to punch|attempt to kick|attempt to throw|quickly dart behind .*? and try to hamstring|mentally attempt to locate your implanted essence|rush forward)|You .*?attempt to (?:kick|punch|jab|grapple)|A wave of power flows out of you and toward|Your (?:<.*?>)?raging sandstorm(?:<.*?>)? swirls around|^The flames surrounding <pushBold\/>an? <a exist="(?:#{immolated.join('|')})" noun=".*?">.*?<\/a><popBold\/> flare up violently\.\.\.|A .*? leaps from a <a.*?>.*?<\/a> <pushBold\/>.*?<a exist="(?:#{weapon_fired.join('|')})".*?>.*?<\/a><popBold\/> is wielding\.|^(?:Brilliant flashes of lightning surround|Large hailstones pound relentlessly on|Violent winds tighten around) <pushBold\/>.*?<a exist="(?:#{maelstromed.join('|')})" noun=".*?">.*?<\/a><popBold\/>\.|Suddenly a lightning bolt explodes from the small thundercloud and strikes <pushBold\/>.*?<a exist="(?:#{lightning_called.join('|')})" noun=".*?">.*?<\/a><popBold\/> with a brilliant flash!/) or (divine_wrath_active and divine_wrath_message[deity] and line =~ divine_wrath_message[deity])
+	elsif (line =~ /You (?:swing|gesture|sing|weave another verse|continue to sing|channel|fire|wave|tap|rub|hurl|thrust|slash|throw|punch|attempt to punch|attempt to kick|attempt to throw|quickly dart behind .*? and try to hamstring|mentally attempt to locate your implanted essence|rush forward)|You .*?attempt to (?:kick|punch|jab|grapple)|A wave of power flows out of you and toward .+ bursts into flames|Your (?:<.*?>)?raging sandstorm(?:<.*?>)? swirls around|^The flames surrounding <pushBold\/>an? <a exist="(?:#{immolated.join('|')})" noun=".*?">.*?<\/a><popBold\/> flare up violently\.\.\.|A .*? leaps from a <a.*?>.*?<\/a> <pushBold\/>.*?<a exist="(?:#{weapon_fired.join('|')})".*?>.*?<\/a><popBold\/> is wielding\.|^(?:Brilliant flashes of lightning surround|Large hailstones pound relentlessly on|Violent winds tighten around) <pushBold\/>.*?<a exist="(?:#{maelstromed.join('|')})" noun=".*?">.*?<\/a><popBold\/>\.|Suddenly a lightning bolt explodes from the small thundercloud and strikes <pushBold\/>.*?<a exist="(?:#{lightning_called.join('|')})" noun=".*?">.*?<\/a><popBold\/> with a brilliant flash!/) or (divine_wrath_active and divine_wrath_message[deity] and line =~ divine_wrath_message[deity])
+		# symbol of holiness
+		if line =~ /^A wave of power flows out of you and toward .+ bursts into flames/
+			subtract_favor.call(3)
+		end
 		if line =~ /You gesture at.*?exist=['"](.*?)['"]/
 			target_npc_id = $1
 		else
@@ -566,10 +569,8 @@ while (line = get)
 		subtract_favor.call(3)
 
 	#
-	# symbol of holiness
+	# symbol of holiness: moved up to kill tracking
 	#
-	elsif line =~ /^A wave of power flows out of you and toward .+ bursts into flames/
-		subtract_favor.call(3)
 
 	#
 	# symbol of recall
@@ -665,37 +666,26 @@ while (line = get)
 	# fixme: need River's Rest messages
 	elsif line =~ /^After a few moments of prayer and reflection you see a vision of a flower that has not yet begun to open\./
 		echo '0-10%'
-		Script.log "level #{Char.level}, step: #{Society.rank}, step favor: #{$favor[:step]}, percent of favor needed to step: 0-10%"
 	elsif line =~ /^After a few moments of prayer and reflection you see a vision of a baby eagle barely hatched from its egg\./
 		echo '10-20%'
-		Script.log "level #{Char.level}, step: #{Society.rank}, step favor: #{$favor[:step]}, percent of favor needed to step: 10-20%"
 	elsif line =~ /^After a few moments of prayer and reflection you see a vision of a butterfly drying its wings on a leaf\./
 		echo '20-30%'
-		Script.log "level #{Char.level}, step: #{Society.rank}, step favor: #{$favor[:step]}, percent of favor needed to step: 20-30%"
 	elsif line =~ /^After a few moments of prayer and reflection you see a vision of the headwaters of a mighty river\.\s? Here it has joined with several other streams and is growing quickly\./
 		echo '30-40%'
-		Script.log "level #{Char.level}, step: #{Society.rank}, step favor: #{$favor[:step]}, percent of favor needed to step: 30-40%"
 	elsif line =~ /^After a few moments of prayer and reflection you see a vision of a weaver on a loom, nearly half way in the creation of an intricate tapestry\./
 		echo '40-50%'
-		Script.log "level #{Char.level}, step: #{Society.rank}, step favor: #{$favor[:step]}, percent of favor needed to step: 40-50%"
 	elsif line =~ /^After a few moments of prayer and reflection you see a brief vision of twin bowls of wine\.\s? You reach out and empty the contents of one into the other filling it up\.\s? You have a sudden desire to fill up the empty bowl too\./
 		echo '50-60%'
-		Script.log "level #{Char.level}, step: #{Society.rank}, step favor: #{$favor[:step]}, percent of favor needed to step: 50-60%"
 	elsif line =~ /^After a few moments of prayer and reflection you see a vision of a hiker as he clears the peak of a hill and begins to descend the other side\./
 		echo '60-70%'
-		Script.log "level #{Char.level}, step: #{Society.rank}, step favor: #{$favor[:step]}, percent of favor needed to step: 60-70%"
 	elsif line =~ /^After a few moments of prayer and reflection you see a vision of a lute, finely crafted, but missing a third of its strings\./
 		echo '70-80%'
-		Script.log "level #{Char.level}, step: #{Society.rank}, step favor: #{$favor[:step]}, percent of favor needed to step: 70-80%"
 	elsif line =~ /^After a few moments of prayer and reflection you see a vision of a rainbow forming as a thunder storm begins to abate\./
 		echo '80-90%'
-		Script.log "level #{Char.level}, step: #{Society.rank}, step favor: #{$favor[:step]}, percent of favor needed to step: 80-90%"
 	elsif line =~ /^After a few moments of prayer and reflection you see a vision of a path as it winds its way through a forest and to the edge of a clear pool\.\s? You have a sudden desire to jump in but cannot\./
 		echo '90-100%'
-		Script.log "level #{Char.level}, step: #{Society.rank}, step favor: #{$favor[:step]}, percent of favor needed to step: 90-100%"
 	elsif line =~ /^After a few moments of prayer and reflection you see a vision of a pool of clear water\.\s? You dive in and swim to the bottom where you find a gold coin engraved with the image of Voln\.\s? An overwhelming feeling makes you realize that you are indeed ready to take the next step along the Path to Enlightenment\./
 		echo '100%'
-		Script.log "level #{Char.level}, step: #{Society.rank}, step favor: #{$favor[:step]}, percent of favor needed to step: 100%"
 	elsif line =~ /^The (?:<.*?>)?globe(?:<.*?>)? feels cold beneath your touch\./
 		high = 999 - globe_offset.call
 		low = 0
@@ -757,7 +747,8 @@ end
 
 	- favor to step -
 
-	- level 3 -
+	- level 3 - (accurate)
+
 	rank  1: 115
 	rank  2: 215
 	rank  3: 315
@@ -784,9 +775,15 @@ end
 	rank 24: 2520
 	rank 25: 2635
 
+	- level 40 - (accurate)
 
+	rank 1: 2766
+	rank 2: 2866
+	rank 3: 2966
+	rank 4: 5733
+	rank 5: 5833
 
-	- level 77 -
+	- level 77 - (inaccurate by undead level variance)
 	
 	step  2:   8,237 -   9,268
 	step  4:  19,060 -  21,443
@@ -795,14 +792,14 @@ end
 	step  7:  30,100 -  33,099
 	step  8:  30,154 -  33,237
 	
-	- level 78 -
+	- level 78 - (inaccurate by undead level variance)
 	
 	step  2:       0 -  12,290
 	step  6:       0 -  31,426
 	step  7:  30,731 -  31,300
 	step  8:  29,983 -  31,359
 	
-	- level 100 -
+	- level 100 - (inaccurate by undead level variance)
 	
 	step 17: 101,615 - 103,877
 	step 18: 101,956 - 110,905
@@ -1417,7 +1414,7 @@ end
 	sym courage =  73 favor
 	sym sleep   = 146 favor
 	sym dimin   = 219 favor
-	sym need    = 291 favor
+	sym need    = 291 favor (wrong on krakii)
 	sym suprem  = 364 favor
 	sym transen = 437 favor
 	sym return  = 728 favor
