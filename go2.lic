@@ -4,6 +4,7 @@
 	attempts to find the shortest route between any two rooms in the game
 	requires map.dat (use updater.lic to get it)
 
+	https://github.com/matt-lowe/lich-scripts
 	tillmen@lichproject.org
 
 =end
@@ -16,26 +17,9 @@ end
 setting_value = { 'on' => true, 'true' => true, 'yes' => true, 'off' => false, 'false' => false, 'no' => false }
 previous = shortest_distances = nil
 
-unless Settings['custom targets']
-	new_settings = Hash.new
-	new_settings['custom targets'] = Hash.new
-	Settings.to_hash.each_pair { |name,target|
-		if name =~ /custom targets|typeahead|portal|vaalor_shortcut/
-			new_settings[name] = target
-		else
-			new_settings['custom targets'][name] = target
-		end
-	}
-	Settings.clear
-	CharSettings['platinum portals'] = new_settings['portal']
-	CharSettings['vaalor shortcut'] = new_settings['vaalor_shortcut']
-	Settings['typeahead'] = new_settings['typeahead']
-	Settings['custom targets'] = new_settings['custom targets']
-	Settings.save
-	new_settings = nil
-end
 Settings['typeahead'] ||= 1
 CharSettings['platinum portals'] ||= false
+CharSettings['use portals'] ||= false
 CharSettings['platinum portal pass'] ||= false
 CharSettings['vaalor shortcut'] ||= false
 CharSettings['ice mode'] ||= :auto
@@ -75,11 +59,13 @@ show_help = proc {
 		respond "       #{$lich_char}#{script.name} use-seeking=<on|off>"
 		respond "       #{$lich_char}#{script.name} use-seeking=<on|off> <target>"
 	end
-	if XMLData.game =~ /^GSPlat/
+	if XMLData.game =~ /^GSPlat|^GSF/
 		respond "       #{$lich_char}#{script.name} portals=<on|off>"
-		respond '              Sets if platinum portals should be used.'
+		respond '              Sets if portals should be used.'
 		respond "       #{$lich_char}#{script.name} portals=<on|off> <target>"
-		respond '              Sets if platinum portals should be used for this trip only.'
+		respond '              Sets if portals should be used for this trip only.'
+	end
+	if XMLData.game =~ /^GSPlat/
 		respond "       #{$lich_char}#{script.name} portal-pass=<on|off>"
 		respond '              Turn this on if you have a wearable portal pass and don\'t need a portal ticket.'
 	end
@@ -405,6 +391,13 @@ if XMLData.game =~ /^GSPlat/
 	else
 		setting_platinum_portal_pass = nil
 	end
+elsif XMLData.game =~ /^GSF/
+	if target_search_string =~ /(?:^|\s)(?:\-\-)?portals?=(on|true|yes|off|false|no)(?:$|\s)/i
+		setting_use_portals = setting_value[$1]
+		target_search_string.gsub!(/(?:^|\s)(?:\-\-)?portals?=(?:on|true|yes|off|false|no)(?:$|\s)/i, '')
+	else
+		setting_use_portals = nil
+	end
 end
 if XMLData.game =~ /^GS/
 	if target_search_string =~ /(?:^|\s)(?:\-\-)?shortcut=(on|true|yes|off|false|no)(?:$|\s)/i
@@ -479,6 +472,12 @@ if target_search_string.empty?
 			end
 			echo "the script will #{'not ' if setting_platinum_portal_pass}try to pull out a portal ticket to use platinum portals"
 		end
+	elsif XMLData.game =~ /^GSF/
+		unless setting_use_portals.nil?
+			CharSettings['use portals'] = setting_use_portals
+			$go2_use_portals = setting_use_portals
+			echo "portals will #{'not ' unless setting_use_portals}be used"
+		end
 	end
 	if XMLData.game =~ /^GS/
 		unless setting_vaalor_shortcut.nil?
@@ -534,6 +533,13 @@ unless setting_ice_mode.nil?
 else
 	$go2_ice_mode = CharSettings['ice mode']
 end
+unless setting_use_portals.nil?
+	before_dying { $go2_use_portals = CharSettings['use portals'] }
+	$go2_use_portals = setting_use_portals
+else
+	$go2_use_portals = CharSettings['use portals']
+end
+
 setting_platinum_portals = CharSettings['platinum portals'] if setting_platinum_portals.nil?
 setting_platinum_portal_pass = CharSettings['platinum portal pass'] if setting_platinum_portal_pass.nil?
 change_map_platinum_portals.call(setting_platinum_portals, setting_platinum_portal_pass)
