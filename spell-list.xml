@@ -361,6 +361,10 @@
    <spell availability='all' name='Prayer of Communion' number='330' type='utility'>
       <cost type='mana'>30</cost>
    </spell>
+   <spell availability='all' name='Symbol of the Proselyte' number='340' type='utility'>
+      <cost type='mana'>40</cost>
+      <cost type='spirit'>2</cost>
+   </spell>
    <spell availability='all' name='Miracle' number='350' type='utility'>
       <cost type='mana'>50</cost>
    </spell>
