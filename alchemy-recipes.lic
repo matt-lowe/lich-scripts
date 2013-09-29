@@ -3359,6 +3359,7 @@ $alchemy_recipes = [
 	r = { :product => 'ursian tusk',                  :steps => [ 'kill tusked ursian' ],       },
 	r = { :product => 'viper fang',                   :steps => [ 'kill black forest viper' ],  },
 	r = { :product => 'tree viper fang',              :steps => [ 'kill tree viper' ],          },
+	r = { :product => 'tree viper fang',              :steps => [ 'kill hanging tree viper' ],  },
 	r = { :product => 'troll fang',                   :steps => [ 'kill troll cheiftain' ],     },
 	r = { :product => 'goat hoof',                    :steps => [ 'kill mountain goat' ],       },
 	r = { :product => 'scraggly orc scalp',           :steps => [ 'kill Neartofar orc' ],       },
