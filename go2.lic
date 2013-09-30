@@ -26,50 +26,49 @@ CharSettings['ice mode'] ||= :auto
 CharSettings['get silvers'] ||= false
 
 show_help = proc {
-	respond
-	respond "Usage: #{$lich_char}#{script.name} <target>"
-	respond '              Takes you where you want to go.'
-	respond '              <target> can be a room number, a custom target, a built-in target,'
-	respond '              or part of the room title or room description.'
-	respond "       #{$lich_char}#{script.name} save <new name>=<target>"
-	respond "              Saves a custom target.  <target> can be any of the previous options, or 'current' for your current room"
-	respond "       #{$lich_char}#{script.name} delete <custom target>"
-	respond '              Deletes a saved custom target.'
-	respond "       #{$lich_char}#{script.name} list"
-	respond '              Shows your custom targets.'
-	respond "       #{$lich_char}#{script.name} targets"
-	respond '              Shows the built-in targets.'
-	respond "       #{$lich_char}#{script.name} typeahead=<#>"
-	respond '              Sets the number of typeahead lines to use.'
-	respond "       #{$lich_char}#{script.name} typeahead=<#> <target>"
-	respond '              Sets the number of typeahead lines to use for this trip only.'
+	output = "\n"
+	output.concat "   #{$lich_char}#{script.name} <target>                Takes you where you want to go using your saved options.\n"
+	output.concat "   #{$lich_char}#{script.name} <options> <target>      Takes you where you want to go, using the given options instead of\n"
+	output.concat "   #{''.rjust($lich_char.length + script.name.length)}                          your saved options.\n"
+	output.concat "   #{$lich_char}#{script.name} <options>               Saves the given options.\n"
+	output.concat "\n"
+	output.concat "   target:\n"
+	output.concat "\n"
+	output.concat "      <target> may be a room number, a custom target, a built-in target,\n"
+	output.concat "       or part of a room title or room description.\n"
+	output.concat "\n"
+	output.concat "   options:\n"
+	output.concat "\n"
+	output.concat "      --typeahead=<#>                        Sets the number of typeahead lines to use.\n"
 	if XMLData.game =~ /^GS/
-		respond "       #{$lich_char}#{script.name} get-silvers=<on|off>"
-		respond "              Sets if #{script.name} has permission to access your bank account."
-		respond "       #{$lich_char}#{script.name} get-silvers=<on|off> <target>"
-		respond "              Sets if #{script.name} has permission to access your bank account for this trip only."
-		respond "       #{$lich_char}#{script.name} shortcut=<on|off>"
-		respond "              Sets if the shortcut to Ta'Vaalor should be used. (climbing and simming needed)"
-		respond "       #{$lich_char}#{script.name} shortcut=<on|off> <target>"
-		respond "              Sets if the shortcut to Ta'Vaalor should be used for this trip only."
-		respond "       #{$lich_char}#{script.name} ice-mode=<auto|wait|run>"
-		respond "       #{$lich_char}#{script.name} ice-mode=<auto|wait|run> <target>"
-		respond "       #{$lich_char}#{script.name} get-return-trip-silvers=<on|off>"
-		respond "       #{$lich_char}#{script.name} get-return-trip-silvers=<on|off> <target>"
-		respond "       #{$lich_char}#{script.name} use-seeking=<on|off>"
-		respond "       #{$lich_char}#{script.name} use-seeking=<on|off> <target>"
+		output.concat "      --get-silvers=<on|off>                 Sets if #{script.name} has permission to access your bank\n"
+		output.concat "                                              account.\n"
+		output.concat "     --shortcut=<on|off>                     Sets if the shortcut to Ta'Vaalor should be used.\n"
+		output.concat "                                              (climbing and/or simming needed)\n"
+		output.concat "     --ice-mode=<auto|wait|run>              Sets how #{script.name} should deal with room the make you\n"
+		output.concat "                                              slip and fall.\n"
+		output.concat "     --get-return-trip-silvers=<on|off>      Sets if #{script.name} should withdraw enough silvers to\n"
+		output.concat "                                              return from your destination room to your starting room.\n"
+		output.concat "     --use-seeking=<on|off>                  Sets if #{script.name} should use Voln symbol of seeking\n"
+		output.concat "                                              when it will shorten your trip.\n"
 	end
 	if XMLData.game =~ /^GSPlat|^GSF/
-		respond "       #{$lich_char}#{script.name} portals=<on|off>"
-		respond '              Sets if portals should be used.'
-		respond "       #{$lich_char}#{script.name} portals=<on|off> <target>"
-		respond '              Sets if portals should be used for this trip only.'
+		output.concat "     --portals=<on|off>                      Sets if portals should be used.\n"
 	end
 	if XMLData.game =~ /^GSPlat/
-		respond "       #{$lich_char}#{script.name} portal-pass=<on|off>"
-		respond '              Turn this on if you have a wearable portal pass and don\'t need a portal ticket.'
+		output.concat "     --portal-pass=<on|off>                  Turn this on if you have a wearable portal pass and don't\n"
+		output.concat "                                              need a portal ticket.\n"
 	end
-	respond
+	output.concat "\n"
+	output.concat "   other commands:\n"
+	output.concat "\n"
+	output.concat "      #{$lich_char}#{script.name} save <new name>=<target>      Saves a custom target.  <target> can be the same as before,\n"
+	output.concat "      #{''.rjust($lich_char.length + script.name.length)}                             	  or 'current' for your current room\n"
+	output.concat "      #{$lich_char}#{script.name} delete <custom target>        Deletes a saved custom target.\n"
+	output.concat "      #{$lich_char}#{script.name} list                          Shows your custom targets.\n"
+	output.concat "      #{$lich_char}#{script.name} targets                       Shows the built-in targets.\n"
+	output.concat "\n"
+	respond output
 }
 
 change_map_platinum_portals = proc { |use_portals,have_pass|
@@ -371,42 +370,30 @@ elsif script.vars[1] =~ /^reload$/i
 	exit
 end
 
-target_search_string = script.vars[0]
-if target_search_string =~ /(?:^|\s)(?:\-\-)?typeahead=([0-9]+)(?:$|\s)/i
-	setting_typeahead = $1.to_i
-	target_search_string.gsub!(/(?:^|\s)(?:\-\-)?typeahead=[0-9]+(?:$|\s)/i, '')
-else
-	setting_typeahead = nil
-end
-if XMLData.game =~ /^GSPlat/
-	if target_search_string =~ /(?:^|\s)(?:\-\-)?portals?=(on|true|yes|off|false|no)(?:$|\s)/i
-		setting_platinum_portals = setting_value[$1]
-		target_search_string.gsub!(/(?:^|\s)(?:\-\-)?portals?=(?:on|true|yes|off|false|no)(?:$|\s)/i, '')
-	else
-		setting_platinum_portals = nil
-	end
-	if target_search_string =~ /(?:^|\s)(?:\-\-)?portal\-pass=(on|true|yes|off|false|no)(?:$|\s)/i
-		setting_platinum_portal_pass = setting_value[$1]
-		target_search_string.gsub!(/(?:^|\s)(?:\-\-)?portal\-pass=(?:on|true|yes|off|false|no)(?:$|\s)/i, '')
-	else
-		setting_platinum_portal_pass = nil
-	end
-elsif XMLData.game =~ /^GSF/
-	if target_search_string =~ /(?:^|\s)(?:\-\-)?portals?=(on|true|yes|off|false|no)(?:$|\s)/i
-		setting_use_portals = setting_value[$1]
-		target_search_string.gsub!(/(?:^|\s)(?:\-\-)?portals?=(?:on|true|yes|off|false|no)(?:$|\s)/i, '')
-	else
-		setting_use_portals = nil
-	end
-end
-if XMLData.game =~ /^GS/
-	if target_search_string =~ /(?:^|\s)(?:\-\-)?shortcut=(on|true|yes|off|false|no)(?:$|\s)/i
+#
+# target and/or options
+#
+
+target_search_array             = Array.new
+setting_typeahead               = nil
+setting_disable_confirm         = false
+setting_vaalor_shortcut         = nil
+setting_ice_mode                = nil
+setting_get_silvers             = nil
+setting_use_seeking             = nil
+setting_get_return_trip_silvers = nil
+setting_platinum_portals        = nil
+setting_platinum_portal_pass    = nil
+setting_use_portals             = nil
+
+for var in script.vars[1..-1]
+	if var =~ /^(?:\-\-)?typeahead=([0-9]+)$/i
+		setting_typeahead = $1.to_i
+	elsif var =~ /^_disable_confirm_$|^--disable-confirm$/i
+		setting_disable_confirm = true
+	elsif (XMLData.game =~ /^GS/) and var =~ /^(?:\-\-)?shortcut=(on|true|yes|off|false|no)$/i
 		setting_vaalor_shortcut = setting_value[$1]
-		target_search_string.gsub!(/(?:^|\s)(?:\-\-)?shortcut=(?:on|true|yes|off|false|no)(?:$|\s)/i, '')
-	else
-		setting_vaalor_shortcut = nil
-	end
-	if target_search_string =~ /(?:^|\s)(?:\-\-)?ice\-?mode=(auto|wait|run)(?:$|\s)/i
+	elsif (XMLData.game =~ /^GS/) and (var =~ /^(?:\-\-)?ice\-?mode=(auto|wait|run)$/i)
 		if $1.downcase == 'auto'
 			setting_ice_mode = :auto
 		elsif $1.downcase == 'wait'
@@ -414,36 +401,23 @@ if XMLData.game =~ /^GS/
 		elsif $1.downcase == 'run'
 			setting_ice_mode = :run
 		end
-		target_search_string.gsub!(/(?:^|\s)(?:\-\-)?ice\-?mode=(auto|wait|run)(?:$|\s)/i, '')
-	else
-		setting_ice_mode = nil
-	end
-	if target_search_string =~ /(?:^|\s)(?:\-\-)?get[_\-]?(?:silver|coin)s?=(on|true|yes|off|false|no)(?:$|\s)/i
+	elsif (XMLData.game =~ /^GS/) and (var =~ /^(?:\-\-)?get[_\-]?(?:silver|coin)s?=(on|true|yes|off|false|no)$/i)
 		setting_get_silvers = setting_value[$1]
-		target_search_string.gsub!(/(?:^|\s)(?:\-\-)?get[_\-]?(?:silver|coin)s?=(?:on|true|yes|off|false|no)(?:$|\s)/i, '')
-	else
-		setting_get_silvers = nil
-	end
-	if target_search_string =~ /(?:^|\s)(?:\-\-)?use[_\-]?seeking=(on|true|yes|off|false|no)(?:$|\s)/i
+	elsif (XMLData.game =~ /^GS/) and (var =~ /^(?:\-\-)?use[_\-]?seeking=(on|true|yes|off|false|no)$/i)
 		setting_use_seeking = setting_value[$1]
-		target_search_string.gsub!(/(?:^|\s)(?:\-\-)?use[_\-]?seeking=(?:on|true|yes|off|false|no)(?:$|\s)/i, '')
-	else
-		setting_use_seeking = nil
-	end
-	if target_search_string =~ /(?:^|\s)(?:\-\-)?get\-return\-trip\-silvers=(on|true|yes|off|false|no)(?:$|\s)/i
+	elsif (XMLData.game =~ /^GS/) and (var =~ /^(?:\-\-)?get\-return\-trip\-silvers=(on|true|yes|off|false|no)$/i)
 		setting_get_return_trip_silvers = setting_value[$1]
-		target_search_string.gsub!(/(?:^|\s)(?:\-\-)?get\-return\-trip\-silvers=(on|true|yes|off|false|no)(?:$|\s)/i, '')
+	elsif (XMLData.game =~ /^GSPlat/) and (var =~ /^(?:\-\-)?portals?=(on|true|yes|off|false|no)$/i)
+		setting_platinum_portals = setting_value[$1]
+	elsif (XMLData.game =~ /^GSPlat/) and (var =~ /^(?:\-\-)?portal\-pass=(on|true|yes|off|false|no)$/i)
+		setting_platinum_portal_pass = setting_value[$1]
+	elsif (XMLData.game =~ /^GSF/) and (var =~ /^(?:\-\-)?portals?=(on|true|yes|off|false|no)$/i)
+		setting_use_portals = setting_value[$1]
 	else
-		setting_get_return_trip_silvers = nil
+		target_search_array.push(var)
 	end
 end
-if target_search_string =~ /(?:^|\s)_disable_confirm_(?:$|\s)|(?:^|\s)--disable-confirm(?:$|\s)/i
-	setting_disable_confirm = true
-	target_search_string.gsub!(/(?:^|\s)_disable_confirm_(?:$|\s)|(?:^|\s)--disable-confirm(?:$|\s)/i, '')
-else
-	setting_disable_confirm = false
-end
-target_search_string = target_search_string.gsub('  ', ' ').strip
+target_search_string = target_search_array.join(' ')
 
 #
 # if only settings were given, save the settings and exit
