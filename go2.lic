@@ -5,7 +5,8 @@
 	requires map.dat (use updater.lic to get it)
 
 	https://github.com/matt-lowe/lich-scripts
-	tillmen@lichproject.org
+	https://www.gittip.com/matt-lowe
+	matt@lichproject.org
 
 =end
 
@@ -18,9 +19,8 @@ setting_value = { 'on' => true, 'true' => true, 'yes' => true, 'off' => false, '
 previous = shortest_distances = nil
 
 Settings['typeahead'] ||= 1
-CharSettings['platinum portals'] ||= false
 CharSettings['use portals'] ||= false
-CharSettings['platinum portal pass'] ||= false
+CharSettings['have portal pass'] ||= false
 CharSettings['vaalor shortcut'] ||= false
 CharSettings['ice mode'] ||= :auto
 CharSettings['get silvers'] ||= false
@@ -72,115 +72,119 @@ show_help = proc {
 }
 
 change_map_platinum_portals = proc { |use_portals,have_pass|
-	to_nexus = {
-		'7561' => "move 'go hole'; ",
-		'9318' => "move 'go portal'; move 'south'; ",
-		'3479' => "move 'go portal'; move 'southwest'; ",
-		'2696' => "move 'go portal'; move 'west'; ",
-		'17691' => "move 'go portal'; move 'northwest'; ",
-		'12584' => "move 'go portal'; move 'north'; ",
-		'9664' => "move 'go portal'; move 'northeast'; ",
-		'20453' => "move 'go portal'; move 'east'; ",
-		'16746' => "move 'go portal'; move 'southeast'; "
- 	}
-	to_old_nexus = {
-		'7561' => "move 'go hole'; ",
-		'5052' => "move 'go portal'; move 'south'; ",
-		'9095' => "move 'go portal'; move 'southwest'; ",
-		'2696' => "move 'go portal'; move 'west'; ",
-		'11128' => "move 'go portal'; move 'northwest'; ",
-		'12387' => "move 'go portal'; move 'north'; ",
-		'648' => "move 'go portal'; move 'northeast'; ",
-		'5766' => "move 'go portal'; move 'east'; ",
-		'5940' => "move 'climb step'; move 'go portal'; move 'southeast'; "
-	}
-	from_nexus = {
-		'7561'  => "move 'out'; ",
-		'9318'  => "move 'north'; move 'go portal'; ",
-		'3479'  => "move 'northeast'; move 'go portal'; ",
-		'2696'  => "move 'east'; move 'go portal'; ",
-		'17691' => "move 'southeast'; move 'go portal'; ",
-		'12584' => "move 'south'; move 'go portal'; ",
-		'9664' => "move 'southwest'; move 'go portal'; ",
-		'20453' => "move 'west'; move 'go portal'; ",
-		'16746' => "move 'northwest'; move 'go portal'; "
-	}
-	from_old_nexus = {
-		'7561'  => "move 'out'; ",
-		'5052'  => "move 'north'; move 'go portal'; ",
-		'9095'  => "move 'northeast'; move 'go portal'; ",
-		'2696'  => "move 'east'; move 'go portal'; ",
-		'11128' => "move 'southeast'; move 'go portal'; ",
-		'12387' => "move 'south'; move 'go portal'; ",
-		'648'  => "move 'southwest'; move 'go portal'; ",
-		'5766' => "move 'west'; move 'go portal'; ",
-		'5940' => "move 'northwest'; move 'go portal'; "
-	}
-	hub_string="group_members = nil\nfor line in clear.reverse\nif line =~ /^Obvious (paths|exits)/\nbreak\nelsif line =~ /^([A-Za-z ,]+) followed\\.$/\ngroup_members = $1.split(/, | and /)\nbreak\nend\nend\nmove 'go portal'\nif group_members\necho \"Waiting for your group... To ditch them, ;send go \"\nbegin\nline = get\nif line =~ /^([A-z][a-z]+) suddenly appears\\.$/\ngroup_members.delete $1\nelsif line == 'go'\nbreak\nend\nend while group_members.length > 0; end;"
-	to_hub={
-		'19706' => hub_string,
-		'19709' => hub_string,
-		'19745' => hub_string,
-		'19752' => hub_string,
-		'19778' => hub_string,
-		'19723' => hub_string,
-		'19721' => hub_string,
-		'19719' => hub_string
-	}
-	transport_hub='19707'
-
-	if use_portals
-		if have_pass
-			before_portal = ''
-			after_portal = ''
+	unless Map.list.any? { |room| room.timeto.any? { |adj_id,time| time.class == Proc and time._dump =~ /$go2_use_portals/ } }
+		to_nexus = {
+			'7561' => "move 'go hole'; ",
+			'9318' => "move 'go portal'; move 'south'; ",
+			'3479' => "move 'go portal'; move 'southwest'; ",
+			'2696' => "move 'go portal'; move 'west'; ",
+			'17691' => "move 'go portal'; move 'northwest'; ",
+			'12584' => "move 'go portal'; move 'north'; ",
+			'9664' => "move 'go portal'; move 'northeast'; ",
+			'20453' => "move 'go portal'; move 'east'; ",
+			'16746' => "move 'go portal'; move 'southeast'; "
+	 	}
+		to_old_nexus = {
+			'7561' => "move 'go hole'; ",
+			'5052' => "move 'go portal'; move 'south'; ",
+			'9095' => "move 'go portal'; move 'southwest'; ",
+			'2696' => "move 'go portal'; move 'west'; ",
+			'11128' => "move 'go portal'; move 'northwest'; ",
+			'12387' => "move 'go portal'; move 'north'; ",
+			'648' => "move 'go portal'; move 'northeast'; ",
+			'5766' => "move 'go portal'; move 'east'; ",
+			'5940' => "move 'climb step'; move 'go portal'; move 'southeast'; "
+		}
+		from_nexus = {
+			'7561'  => "move 'out'; ",
+			'9318'  => "move 'north'; move 'go portal'; ",
+			'3479'  => "move 'northeast'; move 'go portal'; ",
+			'2696'  => "move 'east'; move 'go portal'; ",
+			'17691' => "move 'southeast'; move 'go portal'; ",
+			'12584' => "move 'south'; move 'go portal'; ",
+			'9664' => "move 'southwest'; move 'go portal'; ",
+			'20453' => "move 'west'; move 'go portal'; ",
+			'16746' => "move 'northwest'; move 'go portal'; "
+		}
+		from_old_nexus = {
+			'7561'  => "move 'out'; ",
+			'5052'  => "move 'north'; move 'go portal'; ",
+			'9095'  => "move 'northeast'; move 'go portal'; ",
+			'2696'  => "move 'east'; move 'go portal'; ",
+			'11128' => "move 'southeast'; move 'go portal'; ",
+			'12387' => "move 'south'; move 'go portal'; ",
+			'648'  => "move 'southwest'; move 'go portal'; ",
+			'5766' => "move 'west'; move 'go portal'; ",
+			'5940' => "move 'northwest'; move 'go portal'; "
+		}
+		hub_string="group_members = nil\nfor line in clear.reverse\nif line =~ /^Obvious (paths|exits)/\nbreak\nelsif line =~ /^([A-Za-z ,]+) followed\\.$/\ngroup_members = $1.split(/, | and /)\nbreak\nend\nend\nmove 'go portal'\nif group_members\necho \"Waiting for your group... To ditch them, ;send go \"\nbegin\nline = get\nif line =~ /^([A-z][a-z]+) suddenly appears\\.$/\ngroup_members.delete $1\nelsif line == 'go'\nbreak\nend\nend while group_members.length > 0; end;"
+		to_hub={
+			'19706' => hub_string,
+			'19709' => hub_string,
+			'19745' => hub_string,
+			'19752' => hub_string,
+			'19778' => hub_string,
+			'19723' => hub_string,
+			'19721' => hub_string,
+			'19719' => hub_string
+		}
+		transport_hub='19707'
+	
+		if use_portals
+			if have_pass
+				before_portal = ''
+				after_portal = ''
+			else
+				before_portal = "$go2_portal_need_fill_hand = false; unless (righthand? == 'ticket') or (lefthand? == 'ticket'); empty_hand; $go2_portal_need_fill_hand = true; dothistimeout 'get my portal ticket', 3, /^You remove|^You grab|^You reach into|^Get what\?/; end; unless (righthand? == 'ticket') or (lefthand? == 'ticket'); fill_hand if $go2_portal_need_fill_hand; echo 'a decent portal ticket would be helpful.'; exit; end; result = dothistimeout 'look my portal ticket', 20, /Realizing the ticket has expired|I could not find what you were referring to|days left on your ticket/; unless result =~ /days left on your ticket/; echo 'a decent portal ticket would be helpful.'; exit; end; "
+				after_portal = "dothistimeout 'stow my ticket', 3, /^You put|^You slip .*? into|^You tuck|^What were you trying to stow\?/; fill_hand if $go2_portal_need_fill_hand"
+			end
+			for start_room in to_nexus.keys
+				for end_room in from_nexus.keys
+					if start_room != end_room
+						Map[start_room.to_i].wayto[end_room] = StringProc.new(before_portal + to_nexus[start_room] + from_nexus[end_room] + after_portal)
+						Map[start_room.to_i].timeto[end_room] = 2
+					end
+				end
+			end
+			for start_room in to_hub.keys
+				Map[start_room.to_i].wayto[transport_hub] = StringProc.new(before_portal + to_hub[start_room] + after_portal)
+				Map[start_room.to_i].timeto[transport_hub] = 1
+			end
+			Room[19753].timeto['19745']=0.2
 		else
-			before_portal = "$go2_portal_need_fill_hand = false; unless (righthand? == 'ticket') or (lefthand? == 'ticket'); empty_hand; $go2_portal_need_fill_hand = true; dothistimeout 'get my portal ticket', 3, /^You remove|^You grab|^You reach into|^Get what\?/; end; unless (righthand? == 'ticket') or (lefthand? == 'ticket'); fill_hand if $go2_portal_need_fill_hand; echo 'a decent portal ticket would be helpful.'; exit; end; result = dothistimeout 'look my portal ticket', 20, /Realizing the ticket has expired|I could not find what you were referring to|days left on your ticket/; unless result =~ /days left on your ticket/; echo 'a decent portal ticket would be helpful.'; exit; end; "
-			after_portal = "dothistimeout 'stow my ticket', 3, /^You put|^You slip .*? into|^You tuck|^What were you trying to stow\?/; fill_hand if $go2_portal_need_fill_hand"
-		end
-		for start_room in to_nexus.keys
-			for end_room in from_nexus.keys
-				if start_room != end_room
-					Map[start_room.to_i].wayto[end_room] = StringProc.new(before_portal + to_nexus[start_room] + from_nexus[end_room] + after_portal)
-					Map[start_room.to_i].timeto[end_room] = 2
+			for start_room in to_nexus.keys
+				for end_room in from_nexus.keys
+					if start_room != end_room
+						Map[start_room.to_i].wayto.delete(end_room)
+						Map[start_room.to_i].timeto.delete(end_room)
+					end
 				end
 			end
-		end
-		for start_room in to_hub.keys
-			Map[start_room.to_i].wayto[transport_hub] = StringProc.new(before_portal + to_hub[start_room] + after_portal)
-			Map[start_room.to_i].timeto[transport_hub] = 1
-		end
-		Room[19753].timeto['19745']=0.2
-	else
-		for start_room in to_nexus.keys
-			for end_room in from_nexus.keys
-				if start_room != end_room
-					Map[start_room.to_i].wayto.delete(end_room)
-					Map[start_room.to_i].timeto.delete(end_room)
+			for start_room in to_old_nexus.keys
+				for end_room in from_old_nexus.keys
+					if start_room != end_room
+						Map[start_room.to_i].wayto.delete(end_room)
+						Map[start_room.to_i].timeto.delete(end_room)
+					end
 				end
 			end
-		end
-		for start_room in to_old_nexus.keys
-			for end_room in from_old_nexus.keys
-				if start_room != end_room
-					Map[start_room.to_i].wayto.delete(end_room)
-					Map[start_room.to_i].timeto.delete(end_room)
-				end
+			for start_room in to_hub.keys
+				Map[start_room.to_i].wayto.delete(transport_hub)
+				Map[start_room.to_i].timeto.delete(transport_hub)
 			end
-		end
-		for start_room in to_hub.keys
-			Map[start_room.to_i].wayto.delete(transport_hub)
-			Map[start_room.to_i].timeto.delete(transport_hub)
 		end
 	end
 }
 
 change_map_vaalor_shortcut = proc { |use_shortcut|
-	if use_shortcut
-		Room[16745].timeto['16746'] = 15
-		Room[16746].timeto['16745'] = 15
-	else
-		Room[16745].timeto['16746'] = 15000
-		Room[16746].timeto['16745'] = 15000
+	unless Map.list.any? { |room| room.timeto.any? { |adj_id,time| time.class == Proc and time._dump =~ /$go2_use_vaalor_shortcut/ } }
+		if use_shortcut
+			Room[16745].timeto['16746'] = 15
+			Room[16746].timeto['16745'] = 15
+		else
+			Room[16745].timeto['16746'] = 15000
+			Room[16746].timeto['16745'] = 15000
+		end
 	end
 }
 
@@ -377,13 +381,12 @@ end
 target_search_array             = Array.new
 setting_typeahead               = nil
 setting_disable_confirm         = false
-setting_vaalor_shortcut         = nil
+setting_use_vaalor_shortcut     = nil
 setting_ice_mode                = nil
 setting_get_silvers             = nil
 setting_use_seeking             = nil
 setting_get_return_trip_silvers = nil
-setting_platinum_portals        = nil
-setting_platinum_portal_pass    = nil
+setting_have_portal_pass        = nil
 setting_use_portals             = nil
 
 for var in script.vars[1..-1]
@@ -392,7 +395,7 @@ for var in script.vars[1..-1]
 	elsif var =~ /^_disable_confirm_$|^--disable-confirm$/i
 		setting_disable_confirm = true
 	elsif (XMLData.game =~ /^GS/) and var =~ /^(?:\-\-)?shortcut=(on|true|yes|off|false|no)$/i
-		setting_vaalor_shortcut = setting_value[$1]
+		setting_use_vaalor_shortcut = setting_value[$1]
 	elsif (XMLData.game =~ /^GS/) and (var =~ /^(?:\-\-)?ice\-?mode=(auto|wait|run)$/i)
 		if $1.downcase == 'auto'
 			setting_ice_mode = :auto
@@ -407,12 +410,10 @@ for var in script.vars[1..-1]
 		setting_use_seeking = setting_value[$1]
 	elsif (XMLData.game =~ /^GS/) and (var =~ /^(?:\-\-)?get\-return\-trip\-silvers=(on|true|yes|off|false|no)$/i)
 		setting_get_return_trip_silvers = setting_value[$1]
-	elsif (XMLData.game =~ /^GSPlat/) and (var =~ /^(?:\-\-)?portals?=(on|true|yes|off|false|no)$/i)
-		setting_platinum_portals = setting_value[$1]
-	elsif (XMLData.game =~ /^GSPlat/) and (var =~ /^(?:\-\-)?portal\-pass=(on|true|yes|off|false|no)$/i)
-		setting_platinum_portal_pass = setting_value[$1]
-	elsif (XMLData.game =~ /^GSF/) and (var =~ /^(?:\-\-)?portals?=(on|true|yes|off|false|no)$/i)
+	elsif (XMLData.game =~ /^GSF|^GSPlat/) and (var =~ /^(?:\-\-)?portals?=(on|true|yes|off|false|no)$/i)
 		setting_use_portals = setting_value[$1]
+	elsif (XMLData.game =~ /^GSPlat/) and (var =~ /^(?:\-\-)?portal\-pass=(on|true|yes|off|false|no)$/i)
+		setting_have_portal_pass = setting_value[$1]
 	else
 		target_search_array.push(var)
 	end
@@ -428,36 +429,39 @@ if target_search_string.empty?
 		echo "typeahead setting changed to #{setting_typeahead}"
 	end
 	if XMLData.game =~ /^GSPlat/
-		unless setting_platinum_portals.nil?
-			CharSettings['platinum portals'] = setting_platinum_portals
-			if setting_platinum_portal_pass.nil?
-				change_map_platinum_portals.call(setting_platinum_portals, CharSettings['platinum portal pass'])
+		unless setting_use_portals.nil?
+			CharSettings['use portals'] = setting_use_portals
+			$go2_use_portals = CharSettings['use portals']
+			if setting_have_portal_pass.nil?
+				change_map_platinum_portals.call(setting_use_portals, CharSettings['have portal pass'])
 			else
-				change_map_platinum_portals.call(setting_platinum_portals, setting_platinum_portal_pass)
+				change_map_platinum_portals.call(setting_use_portals, setting_have_portal_pass)
 			end
-			echo "platinum portals will #{'not ' unless setting_platinum_portals}be used"
+			echo "portals will #{'not ' unless setting_use_portals}be used"
 		end
-		unless setting_platinum_portal_pass.nil?
-			CharSettings['platinum portal pass'] = setting_platinum_portal_pass
-			if setting_platinum_portals.nil?
-				change_map_platinum_portals.call(CharSettings['platinum portals'], setting_platinum_portal_pass)
+		unless setting_have_portal_pass.nil?
+			CharSettings['have portal pass'] = setting_have_portal_pass
+			$go2_have_portal_pass = CharSettings['have portal pass']
+			if setting_use_portals.nil?
+				change_map_platinum_portals.call(CharSettings['use portals'], setting_have_portal_pass)
 			else
-				change_map_platinum_portals.call(setting_platinum_portals, setting_platinum_portal_pass)
+				change_map_platinum_portals.call(setting_use_portals, setting_have_portal_pass)
 			end
-			echo "the script will #{'not ' if setting_platinum_portal_pass}try to pull out a portal ticket to use platinum portals"
+			echo "the script will #{'not ' if setting_have_portal_pass}try to pull out a portal ticket to use portals"
 		end
 	elsif XMLData.game =~ /^GSF/
 		unless setting_use_portals.nil?
 			CharSettings['use portals'] = setting_use_portals
-			$go2_use_portals = setting_use_portals
+			$go2_use_portals = CharSettings['use portals']
 			echo "portals will #{'not ' unless setting_use_portals}be used"
 		end
 	end
 	if XMLData.game =~ /^GS/
-		unless setting_vaalor_shortcut.nil?
-			CharSettings['vaalor shortcut'] = setting_vaalor_shortcut
-			change_map_vaalor_shortcut.call(setting_vaalor_shortcut)
-			echo "shortcut between Ta'Vaalor and Ta'Illistim will #{'not ' unless setting_vaalor_shortcut}be used"
+		unless setting_use_vaalor_shortcut.nil?
+			CharSettings['vaalor shortcut'] = setting_use_vaalor_shortcut
+			$go2_use_vaalor_shortcut = setting_use_vaalor_shortcut
+			change_map_vaalor_shortcut.call(setting_use_vaalor_shortcut)
+			echo "shortcut between Ta'Vaalor and Ta'Illistim will #{'not ' unless setting_use_vaalor_shortcut}be used"
 		end
 		unless setting_get_silvers.nil?
 			CharSettings['get silvers'] = setting_get_silvers
@@ -465,6 +469,7 @@ if target_search_string.empty?
 		end
 		unless setting_use_seeking.nil?
 			CharSettings['use seeking'] = setting_use_seeking
+			$go2_use_seeking = CharSettings['use seeking']
 			echo "go2 #{ if setting_use_seeking then 'may' else 'will not' end } use symbol of seeking for faster travel"
 		end
 		unless setting_ice_mode.nil?
@@ -488,38 +493,63 @@ end
 #
 # target was given; use saved settings, override them with command line settings, but don't save them
 #
-setting_typeahead = Settings['typeahead'] if setting_typeahead.nil?
-unless setting_get_silvers.nil?
-	before_dying { $go2_get_silvers = CharSettings['get silvers'] }
-	$go2_get_silvers = setting_get_silvers
-else
-	$go2_get_silvers = CharSettings['get silvers']
-end
-unless setting_use_seeking.nil?
-	before_dying { $go2_use_seeking = CharSettings['use seeking'] }
-	$go2_use_seeking = setting_use_seeking
-else
-	$go2_use_seeking = CharSettings['use seeking']
-end
-unless setting_ice_mode.nil?
-	before_dying { $go2_ice_mode = CharSettings['ice mode'] }
-	$go2_ice_mode = setting_ice_mode
-else
-	$go2_ice_mode = CharSettings['ice mode']
-end
-unless setting_use_portals.nil?
-	before_dying { $go2_use_portals = CharSettings['use portals'] }
-	$go2_use_portals = setting_use_portals
-else
-	$go2_use_portals = CharSettings['use portals']
+if setting_typeahead.nil?
+	setting_typeahead = Settings['typeahead']
 end
 
-setting_platinum_portals = CharSettings['platinum portals'] if setting_platinum_portals.nil?
-setting_platinum_portal_pass = CharSettings['platinum portal pass'] if setting_platinum_portal_pass.nil?
-change_map_platinum_portals.call(setting_platinum_portals, setting_platinum_portal_pass)
-setting_vaalor_shortcut = CharSettings['vaalor shortcut'] if setting_vaalor_shortcut.nil?
-change_map_vaalor_shortcut.call(setting_vaalor_shortcut)
-setting_get_return_trip_silvers = CharSettings['get return trip silvers'] if setting_get_return_trip_silvers
+if setting_get_silvers.nil?
+	$go2_get_silvers = CharSettings['get silvers']
+else
+	before_dying { $go2_get_silvers = CharSettings['get silvers'] }
+	$go2_get_silvers = setting_get_silvers
+end
+
+if setting_use_seeking.nil?
+	$go2_use_seeking = CharSettings['use seeking']
+else
+	before_dying { $go2_use_seeking = CharSettings['use seeking'] }
+	$go2_use_seeking = setting_use_seeking
+end
+
+if setting_ice_mode.nil?
+	$go2_ice_mode = CharSettings['ice mode']
+else
+	before_dying { $go2_ice_mode = CharSettings['ice mode'] }
+	$go2_ice_mode = setting_ice_mode
+end
+
+if setting_use_portals.nil?
+	$go2_use_portals = CharSettings['use portals']
+else
+	before_dying { $go2_use_portals = CharSettings['use portals'] }
+	$go2_use_portals = setting_use_portals
+end
+
+if setting_have_portal_pass.nil?
+	setting_have_portal_pass = CharSettings['have portal pass'] 
+else
+	before_dying { $go2_have_portal_pass = CharSettings['have portal pass'] }
+end
+$go2_have_portal_pass = setting_have_portal_pass
+
+if setting_use_vaalor_shortcut.nil?
+	setting_use_vaalor_shortcut = CharSettings['vaalor shortcut']
+else
+	before_dying { $go2_use_vaalor_shortcut = CharSettings['vaalor shortcut'] }
+end
+$go2_use_vaalor_shortcut = setting_use_vaalor_shortcut
+
+if setting_get_return_trip_silvers.nil?
+	setting_get_return_trip_silvers = CharSettings['get return trip silvers']
+end
+
+if XMLData.game =~ /^GSPlat/
+	change_map_platinum_portals.call(setting_use_portals, setting_have_portal_pass)
+end
+
+if XMLData.game =~ /^GS/
+	change_map_vaalor_shortcut.call(setting_use_vaalor_shortcut)
+end
 
 #
 # find target
