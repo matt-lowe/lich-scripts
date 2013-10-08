@@ -2247,6 +2247,10 @@
       <message type='start'>You feel a strange, foreboding sensation as your hand touches the black doomstone\.</message>
       <message type='end'>The foreboding sensation recedes\.</message>
    </spell>
+  <spell availability='self-cast' name='Divine Word Cooldown' number='9055' type='timer'>
+      <duration persist-on-death='yes' real-time='yes' span='refreshable'>if Skills.slreligion >= 40; 480; elsif Skills.slreligion >= 20; 720; else 1440; end</duration>
+      <message type='start'>Your surroundings grow dim\.\.\.you lapse into a state of awareness only, unable to do anything\.\.\.</message>
+   </spell>
    <spell availability='self-cast' name='Mana Leech Cooldown' number='9516' type='timer'>
       <duration persist-on-death='yes' span='stackable'>1</duration>
       <message type='start'>You feel a sudden rush of power as you absorb [0-9]+ mana!</message>
