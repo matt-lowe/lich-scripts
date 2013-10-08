@@ -469,7 +469,7 @@ if target_search_string.empty?
 		end
 		unless setting_use_seeking.nil?
 			CharSettings['use seeking'] = setting_use_seeking
-			$go2_use_seeking = CharSettings['use seeking']
+			$go2_use_seeking = setting_use_seeking
 			echo "go2 #{ if setting_use_seeking then 'may' else 'will not' end } use symbol of seeking for faster travel"
 		end
 		unless setting_ice_mode.nil?
@@ -682,7 +682,7 @@ loop {
 		if setting_get_return_trip_silvers
 			return_previous, return_shortest_distances = Map.dijkstra(destination.id, start_room.id)
 			return_path = [ start_room.id ]
-			return_path.push(return_previous[path[-1]]) until return_previous[return_path[-1]].nil?
+			return_path.push(return_previous[return_path[-1]]) until return_previous[return_path[-1]].nil?
 			return_path.reverse!
 			return_previous = return_shortest_distances = nil
 			needed_silvers += silver_cost.call(return_path)
