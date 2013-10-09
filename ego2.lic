@@ -390,7 +390,7 @@ find_nearest = proc { |target_list|
 	nearest_id
 }
 
-old_disable_portals_method = proc { |use_portals,have_pass|
+old_disable_portal_method = proc { |use_portals,have_pass|
 	if XMLData.game =~ /^GSPlat/ and not Map.list.any? { |room| room.timeto.any? { |adj_id,time| time.class == Proc and time._dump =~ /$go2_use_portals/ } }
 		for start_room in [ '7561', '9318', '3479', '2696', '17691', '12584', '9664', '20453', '16746' ]
 			for end_room in [ '7561', '9318', '3479', '2696', '17691', '12584', '9664', '20453', '16746' ]
