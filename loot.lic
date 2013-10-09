@@ -5,10 +5,8 @@
 
 	;loot help
 
+	https://github.com/matt-lowe/lich-scripts
 	tillmen@lichproject.org
-
-	# Author: Tillmen
-	# Category: loot
 
 =end
 
@@ -42,6 +40,7 @@ CharSettings['never-empty']     = false     if CharSettings['never-empty'].nil?
 CharSettings['phase-boxes']     = false     if CharSettings['phase-boxes'].nil?
 CharSettings['get-arrows']      = false     if CharSettings['get-arrows'].nil?
 CharSettings['eblade-arrows']   = false     if CharSettings['eblade-arrows'].nil?
+CharSettings['use-ambrominas']  = true      if CharSettings['use-ambrominas'].nil?
 
 CharSettings['loot-types'] = 'gem|reagent|herb|jewelry|magic|scroll|wand|uncommon|box' if CharSettings['loot-types'].nil?
 
@@ -50,21 +49,25 @@ unless $new_loot.class == LimitedArray
 	$new_loot.max_size = 250
 end
 
+injures_on_skin_regex = /^(?:myklian)$/
+injures_on_search_regex = /^(?:myklian|magru)$/
+
 show_settings = proc {
 	fix_setting = { true => 'on', false => 'off' }
 	output = String.new
-	output.concat "skin:          #{fix_setting[char_settings['skin']]}\n"
-	output.concat "604:           #{fix_setting[char_settings['604']]}\n"
-	output.concat "kneel:         #{fix_setting[char_settings['kneel']]}\n"
-	output.concat "safe-kneel:    #{fix_setting[char_settings['safe-kneel']]}\n"
-	output.concat "stance:        #{fix_setting[char_settings['stance']]}\n"
-	output.concat "empty:         #{fix_setting[char_settings['empty']]}\n"
-	output.concat "never-empty:   #{fix_setting[char_settings['never-empty']]}\n"
-	output.concat "phase-boxes:   #{fix_setting[char_settings['phase-boxes']]}\n"
-	output.concat "get-arrows:    #{fix_setting[char_settings['get-arrows']]}\n"
-	output.concat "eblade-arrows: #{fix_setting[char_settings['eblade-arrows']]}\n"
-	output.concat "exclude:       #{char_settings['exclude']}\n"
-	output.concat "loot-types:    #{char_settings['loot-types']}\n"
+	output.concat "skin:           #{fix_setting[char_settings['skin']]}\n"
+	output.concat "604:            #{fix_setting[char_settings['604']]}\n"
+	output.concat "kneel:          #{fix_setting[char_settings['kneel']]}\n"
+	output.concat "safe-kneel:     #{fix_setting[char_settings['safe-kneel']]}\n"
+	output.concat "stance:         #{fix_setting[char_settings['stance']]}\n"
+	output.concat "empty:          #{fix_setting[char_settings['empty']]}\n"
+	output.concat "never-empty:    #{fix_setting[char_settings['never-empty']]}\n"
+	output.concat "phase-boxes:    #{fix_setting[char_settings['phase-boxes']]}\n"
+	output.concat "get-arrows:     #{fix_setting[char_settings['get-arrows']]}\n"
+	output.concat "eblade-arrows:  #{fix_setting[char_settings['eblade-arrows']]}\n"
+	output.concat "use-ambrominas: #{fix_setting[char_settings['use-ambrominas']]}\n"
+	output.concat "exclude:        #{char_settings['exclude']}\n"
+	output.concat "loot-types:     #{char_settings['loot-types']}\n"
 	output.concat "\n"
 	output.concat "lootsack:            #{UserVars.lootsack}\n"
 	lootsack_num = 2
@@ -96,6 +99,8 @@ show_help = proc {
 	output.concat "#{$lich_char}#{script.name} get-arrows=<on/off>      pick up the arrows you fire and put them in your\n"
 	output.concat "#{''.rjust($lich_char.length)}#{''.rjust(script.name.length)}                          arrowsack (or lootsack if arrowsack isn't set)\n"
 	output.concat "#{$lich_char}#{script.name} eblade-arrows=<on/off>   eblade arrows when they fail to bundle\n"
+	output.concat "#{$lich_char}#{script.name} use-ambrominas=<on/off>  eat ambrominas leaf after skinning or searching\n"
+	output.concat "#{''.rjust($lich_char.length)}#{''.rjust(script.name.length)}                          something that causes injury\n"
 	output.concat "#{$lich_char}#{script.name} exclude=<regex>          regex of items not to pick up\n"
 	output.concat "#{$lich_char}#{script.name} exclude=nil              clear exclude setting\n"
 	output.concat "#{$lich_char}#{script.name} loot-types=<regex>       regex of the types of items to pick up\n"
@@ -118,7 +123,7 @@ if script.vars.empty?
 elsif script.vars[0].downcase == 'list'
 	show_settings.call
 	exit
-elsif script.vars[0] =~ /^(skin|604|kneel|safe\-kneel|stance|empty|never\-empty|phase\-boxes|get\-arrows|eblade\-arrows)=(on|off|yes|no|true|false)$/i
+elsif script.vars[0] =~ /^(skin|604|kneel|safe\-kneel|stance|empty|never\-empty|phase\-boxes|get\-arrows|eblade\-arrows|use\-ambrominas)=(on|off|yes|no|true|false)$/i
 	fix_setting = { 'on' => true, 'yes' => true, 'true' => true, 'off' => false, 'no' => false, 'false' => false }
 	CharSettings[$1.downcase] = fix_setting[$2.downcase]
 	echo 'setting saved'
@@ -145,6 +150,21 @@ else
 	show_help.call
 	exit
 end
+
+herbsack_var = nil
+herbsack = proc {
+	if herbsack_var.nil?
+		if herbsack_var = (GameObj.inv.find { |obj| obj.name =~ /\b#{Regexp.escape(UserVars.herbsack.strip)}$/i } || GameObj.inv.find { |obj| obj.name =~ /\b#{Regexp.escape(UserVars.herbsack).sub(' ', ' .*')}$/i } || GameObj.inv.find { |obj| obj.name =~ /\b#{Regexp.escape(UserVars.herbsack).sub(' ', ' .*')}/i } || false)
+			if herbsack_var.contents.nil?
+				put "open ##{herbsack_var.id}"
+				dothistimeout "look in ##{herbsack_var.id}", 5, /^In the/
+			end
+		else
+			echo 'warning: failed to find your herbsack'
+		end
+	end
+	herbsack_var
+}
 
 status_tags
 silence_me
@@ -249,7 +269,7 @@ hook_proc = proc { |client_string|
 			if cmd.downcase == 'list'
 				show_settings.call
 				nil
-			elsif cmd =~ /^(skin|604|kneel|safe\-kneel|stance|empty|never\-empty|phase\-boxes|get\-arrows|eblade\-arrows)=(on|off|yes|no|true|false)$/i
+			elsif cmd =~ /^(skin|604|kneel|safe\-kneel|stance|empty|never\-empty|phase\-boxes|get\-arrows|eblade\-arrows|use\-ambrominas)=(on|off|yes|no|true|false)$/i
 				fix_setting = { 'on' => true, 'yes' => true, 'true' => true, 'off' => false, 'no' => false, 'false' => false }
 				char_settings[$1.downcase] = fix_setting[$2.downcase]
 				respond "[#{script_name}: setting saved]"
@@ -440,21 +460,21 @@ lootsack_put = proc { |obj|
 	$loot_stats['loot_count'] += 1
 	for lootsack in lootsack_list
 		unless failed_drag_lootsack[lootsack.id]
-			result = dothistimeout "_drag ##{obj.id} ##{lootsack.id}", 4, /You put|^You slip your hand|You need a free hand to pick that up\.|It's closed!|^Your .*? won't fit in .*?\.$|^I could not find what you were referring to\.|^Do you want to put that in or on|^You carefully place|^You wipe off the blade and sheathe/
+			result = dothistimeout "_drag ##{obj.id} ##{lootsack.id}", 4, /You put|^You slip your hand|You need a free hand to pick that up\.|It's closed!|^Your .*? won't fit in .*?\.$|^I could not find what you were referring to\.|^Do you want to put that in or on|^You carefully place|^You carefully add|^You wipe off the blade and sheathe|^The .*? is already a bundle\. \s?You carefully place/
 			if result =~ /^Do you want to put that in or on/
 				failed_drag_lootsack[lootsack.id] = true
-				result = dothistimeout "put ##{obj.id} in ##{lootsack.id}", 4, /^You put|^You slip your hand|It's closed!|^Your .*? won't fit in .*?\.$|^I could not find what you were referring to\.|^You carefully place|^You wipe off the blade and sheathe/
+				result = dothistimeout "put ##{obj.id} in ##{lootsack.id}", 4, /^You put|^You slip your hand|It's closed!|^Your .*? won't fit in .*?\.$|^I could not find what you were referring to\.|^You carefully place|^You carefully add|^You wipe off the blade and sheathe^The .*? is already a bundle\. \s?You carefully place/
 			end
 		else
 			unless (GameObj.right_hand.id == obj.id) or (GameObj.left_hand.id == obj.id)
 				dothistimeout "get ##{obj.id}", 4, /^You pick up|^You remove|^You need a free hand to pick that up\.|^I could not find what you were referring to\./
 			end
-			result = dothistimeout "put ##{obj.id} in ##{lootsack.id}", 4, /^You put|^You slip your hand|It's closed!|^Your .*? won't fit in .*?\.$|^I could not find what you were referring to\.|^You carefully place|^You wipe off the blade and sheathe/
+			result = dothistimeout "put ##{obj.id} in ##{lootsack.id}", 4, /^You put|^You slip your hand|It's closed!|^Your .*? won't fit in .*?\.$|^I could not find what you were referring to\.|^You carefully place|^You carefully add|^You wipe off the blade and sheathe^The .*? is already a bundle\. \s?You carefully place/
 		end
 		if result =~ /It's closed!/
 			dothistimeout "open ##{lootsack.id}", 3, /^You open|^That is already open\./
 			need_close_lootsack.push(lootsack.id)
-			result = dothistimeout "put ##{obj.id} in ##{lootsack.id}", 4, /You put|^You slip your hand|You need a free hand to pick that up\.|It's closed!|^Your .*? won't fit in .*?\.$|^I could not find what you were referring to\.|^You carefully place|^You wipe off the blade and sheathe/
+			result = dothistimeout "put ##{obj.id} in ##{lootsack.id}", 4, /^You put|^You slip your hand|You need a free hand to pick that up\.|It's closed!|^Your .*? won't fit in .*?\.$|^I could not find what you were referring to\.|^You carefully place|^You carefully add|^You wipe off the blade and sheathe^The .*? is already a bundle\. \s?You carefully place/
 		end
 		if result =~ /won't fit/
 			rotate_lootsack += 1
@@ -543,6 +563,16 @@ loop {
 					else
 						$loot_stats['failed_skins'] += 1
 					end
+					if CharSettings['use-ambrominas'] and (target.noun =~ injures_on_skin_regex) and ((Wounds.leftHand == 1) or (Wounds.rightHand == 1)) and (leaf = herbsack.call.contents.find { |obj| obj.name == 'some ambrominas leaf' })
+						empty_hand
+						dothistimeout "get ##{leaf.id}", 5, /^You remove/
+						dothistimeout "eat ##{leaf.id}", 5, /^You take a bite/
+						waitrt?
+						if (GameObj.left_hand.id == leaf.id) or (GameObj.right_hand.id == leaf.id)
+							dothistimeout "put ##{leaf.id} in ##{herbsack.call.id}", 5, /^You put/
+						end
+						fill_hand
+					end
 				end
 			end
 			if ((GameObj.right_hand.id == bluntskinweapon.id and GameObj.left_hand.id.nil?) or (GameObj.left_hand.id == bluntskinweapon.id and GameObj.right_hand.id.nil?) or (GameObj.left_hand.id.nil? and GameObj.right_hand.id.nil?) or not CharSettings['never-empty']) and dead_npcs.any? { |npc| (npc.status !~ /gone/) and not Settings['unskinnable'].include?(target.name) and Settings['free-hand-skinnable'].include?(target.name) }
@@ -576,7 +606,7 @@ loop {
 				end
 			end
 			if need_fill_hand
-				dothistimeout "put ##{skinweapon.id} in ##{skinweaponsack.id}", 2, /You put|^You slip your hand|^You carefully place|^You wipe off the blade and sheathe/
+				dothistimeout "put ##{skinweapon.id} in ##{skinweaponsack.id}", 2, /You put|^You slip your hand|^You carefully place|^You carefully add|^You wipe off the blade and sheathe/
 			end
 		end
 		if CharSettings['skin'] and bluntskinweapon and dead_npcs.any? { |npc| Settings['blunt-skinnable'].include?(npc.name) and (not CharSettings['never-empty'] or (GameObj.right_hand.id == bluntskinweapon.id and GameObj.left_hand.id.nil?) or (GameObj.left_hand.id == bluntskinweapon.id and GameObj.right_hand.id.nil?) or (GameObj.left_hand.id.nil? and GameObj.right_hand.id.nil?) or not Settings['free-hand-skinnable'].include?(npc.name)) }
@@ -674,7 +704,7 @@ loop {
 				end
 			end
 			if need_fill_hand
-				dothistimeout "put ##{bluntskinweapon.id} in ##{bluntskinweaponsack.id}", 2, /You put|^You slip your hand|^You carefully place|^You wipe off the blade and sheathe/
+				dothistimeout "put ##{bluntskinweapon.id} in ##{bluntskinweaponsack.id}", 2, /You put|^You slip your hand|^You carefully place|^You carefully add|^You wipe off the blade and sheathe/
 			end
 		end
 		if need_fill_left_hand
@@ -692,11 +722,11 @@ loop {
 		end
 		for target in dead_npcs
 			next if target.status =~ /gone/
-			search_result = dothistimeout "search ##{target.id}", 4, /You search|What were you referring to|Could not find a valid target to loot|You plunge your hand into/
+			search_result = dothistimeout "search ##{target.id}", 4, /You (?:reach out to )?search|What were you referring to|Could not find a valid target to loot|You plunge your hand into/
 			if search_result =~ /You plunge your hand into .*? withdraw your arm to find a .*? (\w+) in your grasp!/
 				echo 'fixme'
 				fput 'stow right'
-			elsif search_result =~ /You search/
+			elsif search_result =~ /You (?:reach out to )?search/
 				while (line = get) and (line !~ /prompt/)
 					if line =~ /exist="(.*?)".*which looks like the heirloom that you are searching for/
 						$loot_grab_list.push($1) unless $loot_grab_list.include?($1)
@@ -722,6 +752,16 @@ loop {
 						end
 					end
 				end
+			end
+			if CharSettings['use-ambrominas'] and (target.noun =~ injures_on_search_regex) and ((Wounds.leftHand == 1) or (Wounds.rightHand == 1)) and (leaf = herbsack.call.contents.find { |obj| obj.name == 'some ambrominas leaf' })
+				empty_hand
+				dothistimeout "get ##{leaf.id}", 5, /^You remove/
+				dothistimeout "eat ##{leaf.id}", 5, /^You take a bite/
+				waitrt?
+				if (GameObj.left_hand.id == leaf.id) or (GameObj.right_hand.id == leaf.id)
+					dothistimeout "put ##{leaf.id} in ##{herbsack.call.id}", 5, /^You put/
+				end
+				fill_hand
 			end
 		end
 	end
@@ -790,10 +830,10 @@ loop {
 						result = dothistimeout "_drag ##{obj.id} ##{bundle.id}", 4, /You add|You need a free hand to pick that up\.|^I could not find what you were referring to\.|^Get what\?|^The .*? is out of your reach\.|^You cannot bundle these together\./
 					end
 					if result =~ /^You cannot bundle these together\./
-						result = dothistimeout "put my arrow in ##{arrowsack.id}", 4, /^You put|^You slip your hand|^You carefully place|^You wipe off the blade and sheathe/
+						result = dothistimeout "put my arrow in ##{arrowsack.id}", 4, /^You put|^You slip your hand|^You carefully place|^You carefully add|^You wipe off the blade and sheathe|^The .*? is already a bundle\. \s?You carefully place/
 					end
 				else
-					result = dothistimeout "_drag ##{obj.id} ##{arrowsack.id}", 4, /^You put|^You slip your hand|^You carefully place|^You wipe off the blade and sheathe/
+					result = dothistimeout "_drag ##{obj.id} ##{arrowsack.id}", 4, /^You put|^You slip your hand|^You carefully place|^You carefully add|^You wipe off the blade and sheathe|^The .*? is already a bundle\. \s?You carefully place/
 				end
 			else
 				lootsack_put.call(obj)
