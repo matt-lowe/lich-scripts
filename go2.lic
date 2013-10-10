@@ -742,7 +742,7 @@ loop {
 					if setting_get_return_trip_silvers
 						return_previous, return_shortest_distances = Map.dijkstra(destination.id, start_room.id)
 						return_path = [ start_room.id ]
-						return_path.push(return_previous[path[-1]]) until return_previous[return_path[-1]].nil?
+						return_path.push(return_previous[return_path[-1]]) until return_previous[return_path[-1]].nil?
 						return_path.reverse!
 						return_previous = return_shortest_distances = nil
 						needed_silvers += silver_cost.call(return_path)
