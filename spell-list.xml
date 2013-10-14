@@ -1294,7 +1294,7 @@
       <message type='start'>You are filled with a deeply confident and fearless composure\.|Your confidence and fearlessness is bolstered\.</message>
       <message type='end'>Your boosted confidence and fearlessness fade\.</message>
    </spell>
-   <spell availability='self-cast' name='Rejuvination' number='1607' type='utility'>
+   <spell availability='self-cast' name='Rejuvenation' number='1607' type='utility'>
       <duration>5.13</duration>
       <cost type='mana'>[7, (0.5 - ((Skills.smc/3)*0.01)) * ([15 + (Skills.slblessings/0.3).to_i, [(maxhealth - health), (maxstamina - stamina)].max].min)].max</cost>
       <message type='start'>Granules of cobalt light coalesce around you and as they begin to seep into your exposed skin, you feel invigorated\.</message>
