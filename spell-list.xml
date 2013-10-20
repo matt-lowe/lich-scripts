@@ -1283,6 +1283,7 @@
    <spell availability='group' name='Arm of the Arkati' number='1605' type='offense'>
       <duration span='stackable' multicastable='yes'>20 + Spells.paladin</duration>
       <cost type='mana'>cost = 5; [5,11,18,26,35,45,56,68,81,95,110,126,143,161,180,200].each { |n| cost += 1 if Skills.slsummoning &gt;= n }; if group? then cost + 1 else cost end</cost>
+      <bonus type='damagefactor'>10 + (bonus = 0; [5,11,18,26,35,45,56,68,81,95,110,126,143,161,180,200].each { |n| bonus += 1 if Skills.slsummoning &gt;= n }; bonus)</bonus>
       <message type='start'>You feel a subdued warmth through your arms and torso, accompanied by a preponderant sense of engagement\.</message>
       <message type='end'>The warmth surrounding you fades with the spiritual force that was surrounding your arms\.</message>
    </spell>
@@ -1306,6 +1307,7 @@
    <spell availability='group' name='Divine Shield' number='1609' type='defense'>
       <duration span='stackable' multicastable='yes'>20 + Spells.paladin</duration>
       <cost type='mana'>9</cost>
+      <bonus type='block'>10 + (bonus = 0; [3,7,12,18,25,33,42,52,63,75,88,102,117,133,150,168,187].each { |n| bonus += 1 if Skills.slblessings &gt;= n }; bonus)</bonus>
       <message type='start'>The warmth works its way toward you, and your shield arm feels much more nimble\.</message>
       <message type='end'>Your skin grows slightly numb for a moment as the warm glow fades from around you\.</message>
    </spell>
@@ -1320,6 +1322,7 @@
    <spell availability='self-cast' name='Patron&apos;s Blessing' number='1611' type='defense'>
       <duration span='stackable' multicastable='yes'>20 + Spells.paladin</duration>
       <cost type='mana'>11 + ((([Spells.paladin,Stats.level].min - 11) * 0.75).round / 3).round</cost>
+      <bonus type='combatmaneuvers'>(10 + (0.75 * (Spells.paladin - 10)).round) + (bonus = 0; [3,7,12,18,25,33,42,52,63,75,88,102,117,133,150,168,187].each { |n| bonus += 1 if Skills.slblessings &gt;= n }; bonus)</bonus>
       <message type='start'>An unbridled power surges through you, infusing your body with might and improving your reactions\.</message>
       <message type='end'>You feel your abilities diminish as the energy provided by your patron fades from around you\.</message>
    </spell>
@@ -1347,6 +1350,8 @@
    <spell availability='self-cast' name='Vigor' number='1616' type='utility'>
       <duration span='stackable' multicastable='yes'>20 + Spells.paladin</duration>
       <cost type='mana'>16</cost>
+      <bonus type='constitution'>4+((Spells.paladin-16)/4 ).floor</bonus>
+      <bonus type='health'>(Spell[1616].constitution*2)+(bonus = 0; [1,3,6,10,15,21,28,36,45,55,66,78,91,105,120,136,153,171,190].each { |n| bonus += 1 if Skills.slblessings &gt;= n }; bonus)</bonus>
       <message type='start'>The blood in your veins thickens and pulses with renewed life!</message>
       <message type='end'>You feel slightly weakened as the blood in your veins thins\.</message>
    </spell>
