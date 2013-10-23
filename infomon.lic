@@ -567,10 +567,10 @@ while line = get
                             total_skill_string.chop.chop
                             
                             output.concat("- Totals:\n")
-							output.concat("  Offense: #{total_offense_string if total_offense_string.length > 0}\n")
-                            output.concat("  Defense: #{total_defense_string if total_defense_string.length > 0}\n")
-                            output.concat("    Stats: #{total_stat_string if total_stat_string.length > 0}\n")
-                            output.concat("   Skills: #{total_skill_string if total_skill_string.length > 0}\n")
+							output.concat("  Offense: #{total_offense_string}\n") if total_offense_string.length > 0
+                            output.concat("  Defense: #{total_defense_string}\n") if total_defense_string.length > 0
+                            output.concat("    Stats: #{total_stat_string}\n") if total_stat_string.length > 0
+                            output.concat("   Skills: #{total_skill_string}\n") if total_skill_string.length > 0
                             output.concat("\n\n")
 						end
 					end					
