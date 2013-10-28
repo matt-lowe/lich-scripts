@@ -550,7 +550,7 @@ while line = get
 							total_offense_string = total_offense_string + total_spiritCS.to_s + ' spirCS, ' if total_spiritCS != 0
 							total_offense_string = total_offense_string + total_sorcererCS.to_s + ' sorcCS, ' if total_sorcererCS != 0
                             total_offense_string = total_offense_string + total_damagefactor.to_s + '% DF ' if total_damagefactor != 0
-                            total_offense_string = total_offense_string + total_uaf.to_s + ' UAF ' if total_uaf != 0
+                            total_offense_string = total_offense_string + total_uaf.to_s + ' UAF, ' if total_uaf != 0
                             total_offense_string.chop!.chop!
                             
 							total_defense_string = total_defense_string + total_boltDS.to_s + ' bDS, ' if total_boltDS != 0
@@ -559,12 +559,12 @@ while line = get
 							total_defense_string = total_defense_string + total_mentalTD.to_s + ' mentTD, ' if total_mentalTD != 0
 							total_defense_string = total_defense_string + total_spiritTD.to_s + ' spirTD, ' if total_spiritTD != 0
 							total_defense_string = total_defense_string + total_sorcererTD.to_s + ' sorcTD, ' if total_sorcererTD != 0
-                            total_defense_string = total_defense_string + total_block.to_s + '% block ' if total_block != 0
+                            total_defense_string = total_defense_string + total_block.to_s + '% block, ' if total_block != 0
                             total_defense_string.chop!.chop!
                             
 							total_stat_string = total_stat_string + total_strength.to_s + ' str, ' if total_strength != 0
                             total_stat_string = total_stat_string + total_constitution.to_s + ' con, ' if total_constitution != 0
-                            total_stat_string = total_stat_string + total_health.to_s + ' health ' if total_health != 0
+                            total_stat_string = total_stat_string + total_health.to_s + ' health, ' if total_health != 0
                             total_stat_string.chop!.chop!
                             
 							total_skill_string = total_skill_string + total_dodging.to_s + ' dodge, ' if total_dodging != 0
