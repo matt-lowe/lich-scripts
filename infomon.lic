@@ -14,7 +14,6 @@
 =end
 
 # fixme: http://forum.gsplayers.com/showthread.php?83278-issue-with-infomon-and-cmans
-# fixme: The Grandmaster says, "I'm sorry to hear that, Useless.  I wish you well with any of your future endeavors."
 
 unless $version.split('.').collect { |num| num.rjust(5, '0') }.join('.') >= '00004.00004.00000'
 	echo 'Your version of Lich is too old for this script.'
