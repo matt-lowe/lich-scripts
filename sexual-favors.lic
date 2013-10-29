@@ -12,7 +12,7 @@
 	Type "favor set <amount>" to set symbol favor to something else.
 	Touch the globe to raise or lower symbol favor to the correct range.
 
-	Favor costs are accurate for levels 3 through 40, and 100.  The other levels
+	Favor costs are accurate for levels 3 through 42, and 100.  The other levels
 	are guessed, but won't be too far off.  Still working on getting them perfect.
 	You can help by running	the measure-favor script.
 
@@ -29,7 +29,11 @@
 	in the weapon name.  If it's wrong, let me know and I'll try to fix it.
 
 	https://github.com/matt-lowe/lich-scripts
-	tillmen@lichproject.org
+
+	author: Tillmen
+	email: tillmen@lichproject.org
+	tags: voln, utility
+	version: 0.3
 
 =end
 
@@ -60,6 +64,8 @@ maelstromed               = LimitedArray.new
 maelstromed.max_size      = 15
 lightning_called          = LimitedArray.new
 lightning_called.max_size = 15
+holy_bolted               = LimitedArray.new
+holy_bolted.max_size      = 15
 banshee_defence           = LimitedArray.new
 banshee_defence.max_size  = 15
 deity                     = nil
@@ -242,7 +248,7 @@ add_commas = proc { |num|
 }
 
 globe_offset = proc {
-	if XMLData.level > 40 and XMLData.level < 100
+	if XMLData.level > 42 and XMLData.level < 100
 		guessed_globe = true
 	else
 		guessed_globe = false
@@ -251,7 +257,7 @@ globe_offset = proc {
 }
 
 subtract_favor = proc { |symbol_factor|
-	if XMLData.level > 40 and XMLData.level < 100
+	if XMLData.level > 42 and XMLData.level < 100
 		guessed_str = ' (guessed)'
 	else
 		guessed_str = String.new
@@ -327,7 +333,7 @@ while (line = get)
 	# fixme: open implode
 	if line =~ /^The glow fades from .*?exist="(.*?)"/
 		banshee_defence.delete($1)
-	elsif (line =~ /You (?:swing|gesture|sing|weave another verse|continue to sing|channel|fire|wave|tap|rub|hurl|thrust|slash|throw|punch|attempt to punch|attempt to kick|attempt to throw|quickly dart behind .*? and try to hamstring|mentally attempt to locate your implanted essence|rush forward)|You .*?attempt to (?:kick|punch|jab|grapple)|A wave of power flows out of you and toward .+ bursts into flames|Your (?:<.*?>)?raging sandstorm(?:<.*?>)? swirls around|^The flames surrounding <pushBold\/>an? <a exist="(?:#{immolated.join('|')})" noun=".*?">.*?<\/a><popBold\/> flare up violently\.\.\.|A .*? leaps from a <a.*?>.*?<\/a> <pushBold\/>.*?<a exist="(?:#{weapon_fired.join('|')})".*?>.*?<\/a><popBold\/> is wielding\.|^(?:Brilliant flashes of lightning surround|Large hailstones pound relentlessly on|Violent winds tighten around) <pushBold\/>.*?<a exist="(?:#{maelstromed.join('|')})" noun=".*?">.*?<\/a><popBold\/>\.|Suddenly a lightning bolt explodes from the small thundercloud and strikes <pushBold\/>.*?<a exist="(?:#{lightning_called.join('|')})" noun=".*?">.*?<\/a><popBold\/> with a brilliant flash!/) or (divine_wrath_active and divine_wrath_message[deity] and line =~ divine_wrath_message[deity])
+	elsif (line =~ /You (?:swing|gesture|sing|weave another verse|continue to sing|channel|fire|wave|tap|rub|hurl|thrust|slash|throw|punch|attempt to punch|attempt to kick|attempt to throw|quickly dart behind .*? and try to hamstring|mentally attempt to locate your implanted essence|rush forward)|You .*?attempt to (?:kick|punch|jab|grapple)|A wave of power flows out of you and toward .+ bursts into flames|Your (?:<.*?>)?raging sandstorm(?:<.*?>)? swirls around|^The flames surrounding <pushBold\/>an? <a exist="(?:#{immolated.join('|')})" noun=".*?">.*?<\/a><popBold\/> flare up violently\.\.\.|A .*? leaps from a <a.*?>.*?<\/a> <pushBold\/>.*?<a exist="(?:#{weapon_fired.join('|')})".*?>.*?<\/a><popBold\/> is wielding\.|^(?:Brilliant flashes of lightning surround|Large hailstones pound relentlessly on|Violent winds tighten around) <pushBold\/>.*?<a exist="(?:#{maelstromed.join('|')})" noun=".*?">.*?<\/a><popBold\/>\.|Suddenly a lightning bolt explodes from the small thundercloud and strikes <pushBold\/>.*?<a exist="(?:#{lightning_called.join('|')})" noun=".*?">.*?<\/a><popBold\/> with a brilliant flash!|^Holy water continues to burn away at .*?exist="(?:#{holy_bolted.join('|')})"/) or (divine_wrath_active and divine_wrath_message[deity] and line =~ divine_wrath_message[deity])
 		# symbol of holiness
 		if line =~ /^A wave of power flows out of you and toward .+ bursts into flames/
 			subtract_favor.call(3)
@@ -337,8 +343,11 @@ while (line = get)
 		else
 			target_npc_id = nil
 		end
+		possible_holy_bolted = nil
 		while (line = get) and (line !~ /<prompt/)
-			if line =~ /Wisps of black smoke swirl around <pushBold\/>.*?<a exist="(.*?)\" noun=".*?">.*?<\/a><popBold\/> and s?he bursts into flame!/
+			if (Skills.slreligion >= 30) and (line =~ /You hurl a stream of holy water at <pushBold\/>.*?<a exist="(.*?)" noun=".*?">.*?<\/a><popBold\/>!/)
+				possible_holy_bolted = $1
+			elsif line =~ /Wisps of black smoke swirl around <pushBold\/>.*?<a exist="(.*?)\" noun=".*?">.*?<\/a><popBold\/> and s?he bursts into flame!/
 				immolated.push($1) unless immolated.include?($1)
 			elsif line =~ /You successfully hit <pushBold\/>.*?<a exist="(.*?)".*?>.*?<\/a><popBold\/> <a.*?>.*?<\/a> with the spell\./
 				weapon_fired.push($1) unless weapon_fired.include?($1)
@@ -354,6 +363,10 @@ while (line = get)
 				divine_wrath_active = false
 			elsif line =~ /^The .*?exist="(.*?)".*? eyes grow wide as .*? watches your gestures!  Suddenly .*? makes hurried movements as .*? recognizes that .*? is about to be attacked by magic!/
 				banshee_defence.push($1)
+			elsif line =~ /^\s*AS\: [\+\-][0-9]+ vs DS\: [\+\-][0-9]+ with AvD\: [\+\-][0-9]+ \+ d100 roll\: \+[0-9]+ = ([\+\-])([0-9]+)/
+				if possible_holy_bolted and ($1 == '+') and ($2.to_i > 100)
+					holy_bolted.push(possible_holy_bolted) unless holy_bolted.include?(possible_holy_bolted)
+				end
 			elsif line =~ /^\s*CS\: [\+\-][0-9]+ \- TD\: \+([0-9]+) \+ CvA\: [\+\-][0-9]+ \+ d100\: \+[0-9]+ == [\+\-][0-9]+/
 				td = $1.to_i
 				unless target_npc_id.nil?
@@ -895,7 +908,7 @@ end
 	   994-  1993	The globe hums and turns slowly once under your fingers.
 	  1994-      	You try to count the number of spins and are certain it was 2 revolutions.
 
-	- level 39-40 globe -
+	- level 39-42 globe -
 
 	    favor		message
 	    -----		-------
@@ -1419,6 +1432,38 @@ end
 	sym transen = 437 favor
 	sym return  = 728 favor
 
+	- level 41 -
+
+	sym bless   =  31 favor
+	sym courage =  76 favor
+	sym sleep   = 151 favor
+	sym dimin   = 226 favor
+	sym need    = 301 favor
+	sym suprem  = 376 favor
+	sym transen = 451 favor
+	sym return  = 751 favor
+
+	- level 42 -
+
+	sym bless   =  31 favor
+	sym courage =  78 favor
+	sym sleep   = 155 favor
+	sym dimin   = 233 favor
+	sym need    = 310 favor
+	sym suprem  = 387 favor
+	sym transen = 465 favor
+	sym return  = 774 favor
+
+	- level 43 -
+
+	sym bless   =  32 favor
+	sym courage =  80 favor
+	sym sleep   = 160 favor
+	sym dimin   = 240 favor (formula says 239)
+	sym need    = 319 favor
+	sym suprem  = 399 favor
+	sym transen = 479 favor (formula says 478)
+	sym return  = 797 favor
 
 
 =end
