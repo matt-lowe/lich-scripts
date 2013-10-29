@@ -1165,6 +1165,7 @@
    <spell availability='self-cast' name='Iron Skin' number='1202' type='defense'>
       <duration span='stackable'>20 + Spells.minormental</duration>
       <cost type='mana'>2</cost>
+      <bonus type='asg'>6 + (bonus = 0; [5,15,30,50,75,105,140,180,225].each { |n| bonus += 1 if Skills.mltransformation &gt;= n }; bonus) + (Char.prof == 'Monk' ? (bonus = 0; [5,15,30,50,75].each { |n| bonus += 1 if Char.level &gt;= n }; bonus) : 0)</bonus>
       <message type='start'>You feel your skin grow tight all across your body and your complexion takes on a .*? quality\.</message>
       <message type='end'>You feel the tension in your skin ease and notice that your complexion returns to normal\.</message>
    </spell>
