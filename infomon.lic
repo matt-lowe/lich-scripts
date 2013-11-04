@@ -13,8 +13,6 @@
 
 =end
 
-# fixme: http://forum.gsplayers.com/showthread.php?83278-issue-with-infomon-and-cmans
-
 unless $version.split('.').collect { |num| num.rjust(5, '0') }.join('.') >= '00004.00004.00000'
 	echo 'Your version of Lich is too old for this script.'
 	exit
@@ -1112,9 +1110,10 @@ while line = get
 			CharSettings['cman'] = Hash.new
 			get
 			while get =~ /^([A-z\s']+)\s+([a-z0-9]+)\s+([0-9])\s*$/
-				cman_name = $1
-				cman_rank = $3
-				CharSettings['cman'][cman_name.strip.downcase.gsub(/[\s\-]/,'_').gsub("'", "")] = cman_rank.to_i
+                cman_rank = $3
+				cman_name = $1.strip.downcase.gsub(/[\s\-]/,'_').gsub("'", "")
+				
+				CharSettings['cman'][cman_name] = cman_rank.to_i
 				begin
 					CMan[cman_name] = cman_rank
 				rescue
