@@ -387,29 +387,29 @@ all_sack_contents = proc {
 cauldron = nil
 drop_cauldron = proc {
 	error = false
-	unless (checkroom == '[A Secluded Corner]') or GameObj.room_desc.find { |obj| obj.noun == 'cauldron' } or GameObj.loot.find { |obj| obj.noun =~ /^(?:cauldron|vat)$/ }
-		unless cauldron = all_sack_contents.call.find { |obj| obj.noun =~ /^(?:cauldron|vat)$/ }
+	unless (checkroom == '[A Secluded Corner]') or GameObj.room_desc.find { |obj| obj.noun == 'cauldron' } or GameObj.loot.find { |obj| obj.noun =~ /^(?:cauldron|vat|kettle)$/ }
+		unless cauldron = all_sack_contents.call.find { |obj| obj.noun =~ /^(?:cauldron|vat|kettle)$/ }
 			echo 'error: missing cauldron'
 			error = true
 		end
 		dothis "get ##{cauldron.id}", /^You remove|^You already have that/
 		# Upon further reflection, you decide it would be best if you just used the already present training cauldron.
 		dothis "drop ##{cauldron.id}", /^You drop/
-		put 'drag cauldron'
+		put "drag #{cauldron.noun}"
 	end
 	!error
 }
 
 force_drop_cauldron = proc {
 	error = false
-	unless cauldron = all_sack_contents.call.find { |obj| obj.noun =~ /^(?:cauldron|vat)$/ }
+	unless cauldron = all_sack_contents.call.find { |obj| obj.noun =~ /^(?:cauldron|vat|kettle)$/ }
 		echo 'error: missing cauldron'
 		error = true
 	else
 		dothis "get ##{cauldron.id}", /^You remove|^You already have that/
 		# Upon further reflection, you decide it would be best if you just used the already present training cauldron.
 		dothis "drop ##{cauldron.id}", /^You drop/
-		put 'drag cauldron'
+		put "drag #{cauldron.noun}"
 	end
 	!error
 }
@@ -990,7 +990,7 @@ recursive_check_recipe = proc { |recipe,tracker,top_level|
 #			unless top_level
 #				tracker[:recipe_count][recipe[:product]] = tracker[:recipe_count][recipe[:product]].to_i + 1
 #			end
-			unless (checkroom == '[A Secluded Corner]') or GameObj.room_desc.any? { |obj| obj.noun == 'cauldron' } or GameObj.loot.any? { |obj| obj.noun =~ /^(?:cauldron|vat)$/ } or all_sack_contents.call.any? { |obj| obj.noun =~ /^(?:cauldron|vat)$/ }
+			unless (checkroom == '[A Secluded Corner]') or GameObj.room_desc.any? { |obj| obj.noun == 'cauldron' } or GameObj.loot.any? { |obj| obj.noun =~ /^(?:cauldron|vat|kettle)$/ } or all_sack_contents.call.any? { |obj| obj.noun =~ /^(?:cauldron|vat|kettle)$/ }
 				tracker[:error]['cauldron'] = 1
 			end
 		elsif step =~ /^special/
@@ -1325,9 +1325,9 @@ do_steps = proc { |steps|
 					echo 'waiting for mana...'
 					wait_until { mana >= 10 }
 				end
-				boil_result = dothis 'alchemy boil', /^You focus on the [\w\s\-]+ (?:cauldron|vat) and push mana into it.  The flame beneath it (flickers briefly, but then dies down|quickly flares up wildly, bringing the contents to a rolling boil)\.$/
+				boil_result = dothis 'alchemy boil', /^You focus on the [\w\s\-]+ (?:cauldron|vat|kettle) and push mana into it.  The flame beneath it (flickers briefly, but then dies down|quickly flares up wildly, bringing the contents to a rolling boil)\.$/
 				waitrt?
-				break if boil_result =~ /^You focus on the [\w\s\-]+ (?:cauldron|vat) and push mana into it.  The flame beneath it quickly flares up wildly, bringing the contents to a rolling boil\.$/
+				break if boil_result =~ /^You focus on the [\w\s\-]+ (?:cauldron|vat|kettle) and push mana into it.  The flame beneath it quickly flares up wildly, bringing the contents to a rolling boil\.$/
 			}
 		elsif step == 'simmer'
 			loop {
@@ -1335,7 +1335,7 @@ do_steps = proc { |steps|
 					echo 'waiting for mana...'
 					wait_until { mana >= 10 }
 				end
-				# simmer_result = dothis 'alchemy simmer', /^You focus on the [\w\s\-]+ (?:cauldron|vat) and gently push mana into it\.  The flame beneath it (flickers briefly, but then dies down|quickly flares to life, bringing the contents to a slow simmer)\.$/
+				# simmer_result = dothis 'alchemy simmer', /^You focus on the [\w\s\-]+ (?:cauldron|vat|kettle) and gently push mana into it\.  The flame beneath it (flickers briefly, but then dies down|quickly flares to life, bringing the contents to a slow simmer)\.$/
 				simmer_result = dothis 'alchemy simmer', /flickers briefly, but then dies down|quickly flares to life, bringing the contents to a slow simmer/
 				waitrt?
 				break if simmer_result =~ /quickly flares to life, bringing the contents to a slow simmer/
