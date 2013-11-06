@@ -392,7 +392,7 @@ drop_cauldron = proc {
 			echo 'error: missing cauldron'
 			error = true
 		end
-		dothis "get ##{cauldron.id}", /^You remove|^You already have that/
+		dothis "get ##{cauldron.id}", /^You remove|^You already have that|^You deatch/
 		# Upon further reflection, you decide it would be best if you just used the already present training cauldron.
 		dothis "drop ##{cauldron.id}", /^You drop/
 		put "drag #{cauldron.noun}"
@@ -406,7 +406,7 @@ force_drop_cauldron = proc {
 		echo 'error: missing cauldron'
 		error = true
 	else
-		dothis "get ##{cauldron.id}", /^You remove|^You already have that/
+		dothis "get ##{cauldron.id}", /^You remove|^You already have that|^You detach/
 		# Upon further reflection, you decide it would be best if you just used the already present training cauldron.
 		dothis "drop ##{cauldron.id}", /^You drop/
 		put "drag #{cauldron.noun}"
