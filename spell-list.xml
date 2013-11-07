@@ -960,8 +960,8 @@
       <duration>Spellsong.timeleft</duration>
       <cost type='mana'>7+[[Spells.bard-7,0].max,13].min</cost>
       <cost type='renew'>2+[[Spells.bard-7,0].max,13].min</cost>
-      <bonus type='bolt-as'>[[3+Spells.bard,10].max,20].min</bonus>
-      <bonus type='physical-as'>[[3+Spells.bard,10].max,20].min</bonus>
+      <bonus type='bolt-as'>([[3+Spells.bard,10].max,20].min)+(bonus=0;[3,7,12,18,25,33,42,52,63,75,88,102,117,133,150,168,187].each { |n| bonus+=1 if Skills.mltelepathy &gt;= n }; bonus)</bonus>
+      <bonus type='physical-as'>([[3+Spells.bard,10].max,20].min)+(bonus=0;[3,7,12,18,25,33,42,52,63,75,88,102,117,133,150,168,187].each { |n| bonus+=1 if Skills.mltelepathy &gt;= n }; bonus)</bonus>
       <message type='start'>Your (?:spirit is|spirits are) lifted by the verses praising Kai\.</message>
       <message type='end'>Your (?:spirit is|spirits are) no longer lifted by stories of Kai&apos;s Triumphs\.</message>
    </spell>
@@ -1213,6 +1213,7 @@
    <spell availability='all' name='Mind over Body' number='1213' type='utility'>
       <duration max="599">599</duration>
       <cost type='mana'>13</cost>
+      <bonus type='stamina-reduction'>20+(bonus=0;[6,15,30,80,150,230].each { |n| bonus += 5 if Skills.mltelepathy &gt;= n };bonus)</bonus>
       <message type='start'>Your muscles ripple momentarily and you suddenly become aware of a multitude of your body&apos;s processes\.  You feel an unnatural control over your breathing, heart rate and muscle tension\.</message>
       <message type='end'>You feel your muscles begin to strain for an instant\.  The sense of body control has left you\.</message>
    </spell>
@@ -1519,7 +1520,7 @@
    </spell>
    <spell availability='self-cast' name='Surge of Strength' number='9605' type='utility'>
       <duration>1.5</duration>
-      <cost type='stamina'>if Spell[9606].active? then 60 else 30 end</cost>
+      <cost type='stamina'>(if Spell[9606].active? then 60 else 30 end)*(Spell[1213].active? ? (1-(Spell[1213].stamina_reduction/100.0)) : 1)</cost>
       <cast-proc>dothistimeout &apos;cman surge&apos;, 3, /^You feel (?:significantly|a great deal|a fair amount) stronger\.$|^Your muscles ache much too badly to even think about attempting this maneuver\.$/</cast-proc>
       <message type='start'>You focus deep within yourself, searching for untapped sources of strength[\s\w\.]*</message>
       <message type='end'>You begin to lose touch with your internal sources of strength\.</message>
@@ -1572,7 +1573,7 @@
    </spell>
    <spell availability='self-cast' name='Burst of Swiftness' number='9625' type='utility'>
       <duration>1.5</duration>
-      <cost type='stamina'>if Spell[9051].active?; 60; else; 30; end</cost>
+      <cost type='stamina'>(if Spell[9051].active?; 60; else; 30; end)*(Spell[1213].active? ? (1-(Spell[1213].stamina_reduction/100.0)) : 1)</cost>
       <cast-proc>dothistimeout &apos;cman burst&apos;, 3, /^You feel (?:significantly|a great deal|a fair amount) more (?:agile|dextrous)\.$|^Your muscles ache much too badly to even think about attempting this maneuver\.$/</cast-proc>
       <message type='start'>You prepare yourself to move swiftly at a moment&apos;s notice.*</message>
       <message type='end'>You feel less prepared to move as swiftly as before\.</message>
