@@ -531,7 +531,7 @@ elsif script.vars[1].downcase == 'fill'
 	end
 	close_herbsack = false
 	if herb_container.contents.nil?
-		open_result = dothistimeout "open ##{herb_container.id}", 10, /^You open|^That is already open\.$/
+		open_result = dothistimeout "open ##{herb_container.id}", 10, /^You open|^That is already open\.$|^There doesn't seem to be any way to do that\./
 		if open_result =~ /^You open/
 			close_herbsack = true
 		else
@@ -590,7 +590,7 @@ elsif script.vars[1].downcase == 'escort'
 		exit
 	end
 	if herb_container.contents.nil?
-		open_result = dothistimeout "open ##{herb_container.id}", 10, /^You open|^That is already open\.$/
+		open_result = dothistimeout "open ##{herb_container.id}", 10, /^You open|^That is already open\.$|^There doesn't seem to be any way to do that\./
 		if open_result =~ /^You open/
 			close_herbsack = true
 		else
@@ -802,7 +802,7 @@ elsif script.vars[1].downcase == 'stock'
 		exit
 	end
 	if herb_container.contents.nil?
-		open_result = dothistimeout "open ##{herb_container.id}", 10, /^You open|^That is already open\.$/
+		open_result = dothistimeout "open ##{herb_container.id}", 10, /^You open|^That is already open\.$|^There doesn't seem to be any way to do that\./
 		if open_result =~ /^You open/
 			close_herbsack = true
 		else
@@ -979,7 +979,7 @@ else
 	end
 
 	if herb_container.contents.nil?
-		open_result = dothistimeout "open ##{herb_container.id}", 10, /^You open|^That is already open\.$/
+		open_result = dothistimeout "open ##{herb_container.id}", 10, /^You open|^That is already open\.$|^There doesn't seem to be any way to do that\./
 		if open_result =~ /^You open/
 			close_herbsack = true
 		else
