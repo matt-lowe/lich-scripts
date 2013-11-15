@@ -672,7 +672,7 @@ $alchemy_recipes = [
 		:product => 'inky black potion',
 		:steps   => [ 'light', 'add flask of clear water', 'add some essence of water', 'simmer', 'add some powdered uncut diamond', 'add some faintly radiant dust', 'infuse', 'add inky necrotic core', 'add flask of sparkling soul essence', 'chant 735', 'seal' ],
 		:type 	 => 'potions',
-		:spell	 => '735'
+		:spell	 => '735',
 		:for	 => [ 'Sorcerer' ],
 	},
 	r = {
