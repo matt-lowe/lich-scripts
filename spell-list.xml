@@ -1520,7 +1520,7 @@
    </spell>
    <spell availability='self-cast' name='Surge of Strength' number='9605' type='utility'>
       <duration>1.5</duration>
-      <cost type='stamina'>(if Spell[9606].active? then 60 else 30 end)*(Spell[1213].active? ? (1-(Spell[1213].stamina_reduction/100.0)) : 1)</cost>
+      <cost type='stamina'>(if Spell[9606].active? then 60 else 30 end)*((Spell[1213].active? and defined?(Spell[1213].stamina_reduction)) ? (1-(Spell[1213].stamina_reduction/100.0)) : 1)</cost>
       <cast-proc>dothistimeout &apos;cman surge&apos;, 3, /^You feel (?:significantly|a great deal|a fair amount) stronger\.$|^Your muscles ache much too badly to even think about attempting this maneuver\.$/</cast-proc>
       <message type='start'>You focus deep within yourself, searching for untapped sources of strength[\s\w\.]*</message>
       <message type='end'>You begin to lose touch with your internal sources of strength\.</message>
@@ -1573,7 +1573,7 @@
    </spell>
    <spell availability='self-cast' name='Burst of Swiftness' number='9625' type='utility'>
       <duration>1.5</duration>
-      <cost type='stamina'>(if Spell[9051].active?; 60; else; 30; end)*(Spell[1213].active? ? (1-(Spell[1213].stamina_reduction/100.0)) : 1)</cost>
+      <cost type='stamina'>(if Spell[9051].active?; 60; else; 30; end)*((Spell[1213].active? and defined?(Spell[1213].stamina_reduction)) ? (1-(Spell[1213].stamina_reduction/100.0)) : 1)</cost>
       <cast-proc>dothistimeout &apos;cman burst&apos;, 3, /^You feel (?:significantly|a great deal|a fair amount) more (?:agile|dextrous)\.$|^Your muscles ache much too badly to even think about attempting this maneuver\.$/</cast-proc>
       <message type='start'>You prepare yourself to move swiftly at a moment&apos;s notice.*</message>
       <message type='end'>You feel less prepared to move as swiftly as before\.</message>
