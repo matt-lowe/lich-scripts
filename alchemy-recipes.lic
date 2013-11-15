@@ -669,6 +669,13 @@ $alchemy_recipes = [
 	# alchemic potions recipes
 	#
 	r = {
+		:product => 'inky black potion',
+		:steps   => [ 'light', 'add flask of clear water', 'add some essence of water', 'simmer', 'add some powdered uncut diamond', 'add some faintly radiant dust', 'infuse', 'add inky necrotic core', 'add flask of sparkling soul essence', 'chant 735', 'seal' ],
+		:type 	 => 'potions',
+		:spell	 => '735'
+		:for	 => [ 'Sorcerer' ],
+	},
+	r = {
 		:product => 'light blue potion',
 		:steps   => [ 'light', 'add flask of clear water', 'add ayana leaf', 'simmer', 'add some powdered turquoise stone', 'boil', 'add small daisy', 'add small daisy', 'chant 101', 'seal' ],
 		:type    => 'potions',
