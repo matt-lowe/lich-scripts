@@ -33,6 +33,7 @@
 	</type>
 	<type name="food">
 		<noun>^(?:doughnut|tart|cupcake|cookie|muffin)$</noun>
+		<name>layer of onion skin</name>
 		<exclude>^(?:Ma Leaftoe's spiced torban tart|Leaftoe's lichen tart|iceberry tart|Dabbings Family special tart|flower\-shaped tart)$</exclude>
 	</type>
 	<type name="uncommon">
@@ -61,7 +62,7 @@
 	<type name="skin">
 		<name>^(?:bundle of )?(?:rolton horn|minotaur horn|rotted canine|troll knuckle|vor'taz horn|mottled faeroth crest|basilisk crest|scaly burgee shell|shelfae crest|rattlesnake rattle|crooked crone finger|spider leg|ghoul finger|aivren gizzard|spectre nail|bighorn sheepskin|skeletal warhorse jaw|faceted crystal crab shell|hisskra teeth)s?$</name>
 		<noun>^(?:ambergris|antler|beard|bone|caederine|canine|carapace|claw|crest|ear|ears|eye|eyeball|fang|feather|fin|finger|firethorn|fishscale|fur|heart|hide|hoof|horn|horseshoe|incisor|jaw|jawbone|knuckle|leg|mandible|mane|nail|nose|paw|pelt|pincer|plume|rattle|sail|scale|scalp|scraping|sheepskin|shinbone|shroud|skin|skull|snout|spine|stinger|tail|tailfeather|tailspike|talon|tentacle|thumb|toe|tongue|tooth|tusk|whisker|wing)s?$</noun>
-		<exclude>^(?:pair of small steel jaws|glistening onyx talon|milky quartz eye|table leg|polished shark tooth|fiery ruby talon|obsidian eye|petrified tiger tooth|deep blue sapphire talon|sparkling emerald talon|large troll tooth|lynx skull|iron fang|silver fang|steel fang|copper fang|bronze fang|mithril fang|platinum fang|gold fang|petrified mammoth tusk|small troll tooth|some cactacae spine)$|^(?:bent|corroded|dented|polished|rusty|scratched|shiny|tarnished) (?:horseshoe|nail)$</exclude>
+		<exclude>^(?:pair of small steel jaws|glistening onyx talon|milky quartz eye|table leg|polished shark tooth|fiery ruby talon|obsidian eye|petrified tiger tooth|deep blue sapphire talon|sparkling emerald talon|large troll tooth|lynx skull|iron fang|silver fang|steel fang|copper fang|bronze fang|mithril fang|platinum fang|gold fang|petrified mammoth tusk|small troll tooth|some cactacae spine|layer of onion skin)$|^(?:bent|corroded|dented|polished|rusty|scratched|shiny|tarnished) (?:horseshoe|nail)$</exclude>
 	</type>
 	<type name="wand">
 		<noun>^(?:rod|wand|baton)$</noun>
@@ -127,6 +128,6 @@
 	<sellable name="furrier">
 		<name>^(?:bundle of )?(?:jagged rift crawler tooth|hisskra tooth|rolton horn|minotaur horn|rotted canine|tundra giant tooth|troll knuckle|ogre tooth|vor'taz horn|mottled faeroth crest|basilisk crest|scaly burgee shell|shelfae crest|rattlesnake rattle|crooked crone finger|spider leg|ghoul finger|aivren gizzard|spectre nail|bighorn sheepskin|skeletal warhorse jaw|faceted crystal crab shell|hisskra teeth)s?$</name>
 		<noun>^(?:ambergris|antler|beard|bone|caederine|canine|carapace|claw|crest|ear|ears|eye|eyeball|fang|feather|fin|finger|firethorn|fishscale|fur|heart|hide|hoof|horn|horseshoe|incisor|jaw|jawbone|knuckle|leg|mandible|mane|nail|nose|paw|pelt|pincer|plume|rattle|sail|scale|scalp|scraping|sheepskin|shinbone|shroud|skin|skull|snout|spine|stinger|tail|tailfeather|tailspike|talon|tentacle|thumb|toe|tongue|tooth|tusk|whisker|wing)s?$</noun>
-		<exclude>^(?:pair of small steel jaws|glistening onyx talon|milky quartz eye|table leg|polished shark tooth|fiery ruby talon|obsidian eye|petrified tiger tooth|deep blue sapphire talon|sparkling emerald talon|iron fang|silver fang|steel fang|copper fang|bronze fang|mithril fang|platinum fang|gold fang|petrified mammoth tusk|perfect myklian belly scale|some cactacae spine|small troll tooth|large troll tooth)$|^(?:bent|corroded|dented|polished|rusty|scratched|shiny|tarnished) (?:horseshoe|nail)$</exclude>
+		<exclude>^(?:pair of small steel jaws|glistening onyx talon|milky quartz eye|table leg|polished shark tooth|fiery ruby talon|obsidian eye|petrified tiger tooth|deep blue sapphire talon|sparkling emerald talon|iron fang|silver fang|steel fang|copper fang|bronze fang|mithril fang|platinum fang|gold fang|petrified mammoth tusk|perfect myklian belly scale|some cactacae spine|small troll tooth|large troll tooth|layer of onion skin)$|^(?:bent|corroded|dented|polished|rusty|scratched|shiny|tarnished) (?:horseshoe|nail)$</exclude>
 	</sellable>
 </data>
