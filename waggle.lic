@@ -9,6 +9,7 @@
 
 	Required: Lich 4.4.6
 
+	https://github.com/matt-lowe/lich-scripts
 	tillmen@lichproject.org
 
 =end
@@ -26,6 +27,7 @@ use_multicast     = true if use_multicast.nil?
 use_wracking      = CharSettings['use_wracking']      || false
 wander_to_wrack   = CharSettings['wander_to_wrack']   || false
 use_power         = CharSettings['use_power']         || false
+use_mana          = CharSettings['use_mana']          || false
 use_concentration = CharSettings['use_concentration'] || false
 skip_jerks        = CharSettings['skip_jerks']        || false
 reserve_mana      = CharSettings['reserve_mana']      || 0
@@ -78,6 +80,11 @@ if setting = script.vars.find { |var| var =~ /^\-\-use[_\-]concentration=(?:on|o
 	use_concentration = fix_setting[setting.slice(/on|off/)]
 	script.vars.delete(setting)
 end
+if setting = script.vars.find { |var| var =~ /^\-\-use[_\-]mana=(?:on|off)$/ }
+	fix_setting = { 'on' => true, 'off' => false }
+	use_mana = fix_setting[setting.slice(/on|off/)]
+	script.vars.delete(setting)
+end
 if setting = script.vars.find { |var| var =~ /^\-\-skip[_\-]jerks=(?:on|off)$/ }
 	fix_setting = { 'on' => true, 'off' => false }
 	skip_jerks = fix_setting[setting.slice(/on|off/)]
@@ -100,6 +107,7 @@ if script.vars.include?('--save')
 	CharSettings['use_multicast']     = use_multicast
 	CharSettings['wander_to_wrack']   = wander_to_wrack
 	CharSettings['use_power']         = use_power
+    CharSettings['use_mana']          = use_mana
 	CharSettings['use_concentration'] = use_concentration
 	CharSettings['skip_jerks']        = skip_jerks
 	CharSettings['start_at']          = start_at
@@ -138,6 +146,7 @@ elsif script.vars[1].downcase == 'help'
 	respond "   #{$clean_lich_char}#{script.name} wracking [on/off]           use sign of wracking when out of mana"
 	respond "   #{$clean_lich_char}#{script.name} wander [on/off]             wander up to 20 rooms to find an empty room to wrack in and return"
 	respond "   #{$clean_lich_char}#{script.name} power [on/off]              use sigil of power when out of mana"
+    respond "   #{$clean_lich_char}#{script.name} mana [on/off]               use sigil of mana when out of mana"
 	respond "   #{$clean_lich_char}#{script.name} concentration [on/off]      use sigil of power when out of mana"
 	respond "   #{$clean_lich_char}#{script.name} skip-jerks [on/off]         skip targets that don't share their current spell durations"
 	respond "   #{$clean_lich_char}#{script.name} retribution-spell [#|none]  spell number for chant retribution after casting cloak of shadows"
@@ -149,7 +158,7 @@ elsif script.vars[1].downcase == 'help'
 	respond
 	respond "   Any or all saved options can be overridden on the command line without being saved using the following syntax:"
 	respond
-	respond "   #{$clean_lich_char}#{script.name} --cast-list=401,406,503 --start-at=60 --stop-at=120 --stop-before=250 --refreshable-min=10 --use-wracking=on --wander-to-wrack=on --use-power=off --use-concentration=off --skip-jerks=on --retribution-spell=717 Jim Joe Bob"
+	respond "   #{$clean_lich_char}#{script.name} --cast-list=401,406,503 --start-at=60 --stop-at=120 --stop-before=250 --refreshable-min=10 --use-wracking=on --wander-to-wrack=on --use-power=off --use-mana=off --use-concentration=off --skip-jerks=on --retribution-spell=717 Jim Joe Bob"
 	respond
 	exit
 elsif script.vars[1] =~ /^setup$|^options$/i
@@ -249,7 +258,9 @@ elsif script.vars[1] =~ /^setup$|^options$/i
 			wander_to_wrack_option = Gtk::CheckButton.new('wander to wrack')
 			wander_to_wrack_option.active = wander_to_wrack
 			use_power_option = Gtk::CheckButton.new('power')
-			use_power_option.active = use_power
+            use_power_option.active = use_power
+            use_mana_option = Gtk::CheckButton.new('mana')
+			use_mana_option.active = use_mana
 			use_concentration_option = Gtk::CheckButton.new('concentration')
 			use_concentration_option.active = use_concentration
 			skip_jerks_option = Gtk::CheckButton.new('skip jerks')
@@ -260,6 +271,7 @@ elsif script.vars[1] =~ /^setup$|^options$/i
 			option_box.pack_start(use_wracking_option, false, false, 4)
 			option_box.pack_start(wander_to_wrack_option, false, false, 4)
 			option_box.pack_start(use_power_option, false, false, 4)
+            option_box.pack_start(use_mana_option, false, false, 4)
 			option_box.pack_start(use_concentration_option, false, false, 4)
 			option_box.pack_start(skip_jerks_option, false, false, 4)
 
@@ -421,6 +433,7 @@ elsif script.vars[1] =~ /^setup$|^options$/i
 					use_wracking = use_wracking_option.active?
 					wander_to_wrack = wander_to_wrack_option.active?
 					use_power = use_power_option.active?
+                    use_mana = use_mana_option.active?
 					use_concentration = use_concentration_option.active?
 					skip_jerks = skip_jerks_option.active?
 					window_width = window.allocation.width
@@ -447,6 +460,7 @@ elsif script.vars[1] =~ /^setup$|^options$/i
 			CharSettings['use_wracking']      = use_wracking
 			CharSettings['wander_to_wrack']   = wander_to_wrack
 			CharSettings['use_power']         = use_power
+            CharSettings['use_mana']          = use_mana
 			CharSettings['use_concentration'] = use_concentration
 			CharSettings['skip_jerks']        = skip_jerks
 			CharSettings['start_at']          = start_at
@@ -501,6 +515,7 @@ elsif script.vars[1] =~ /^list$|^show$/i
 	respond "      sign of wracking: #{fix_setting[use_wracking]}"
 	respond "       wander to wrack: #{fix_setting[wander_to_wrack]}"
 	respond "        sigil of power: #{fix_setting[use_power]}"
+    respond "        symbol of mana: #{fix_setting[use_mana]}"
 	respond "sigil of concentration: #{fix_setting[use_concentration]}"
 	respond "            skip jerks: #{fix_setting[skip_jerks]}"
 	respond "     retribution spell: #{retribution_spell || 'none'}"
@@ -579,6 +594,17 @@ elsif script.vars[1].downcase =~ /^(?:use[_\-])?power$/
 	elsif script.vars[2].downcase == 'off'
 		CharSettings['use_power'] = false
 		echo "sigil of power will not be used"
+	else
+		echo "You're doing it wrong..."
+	end
+	exit
+elsif script.vars[1].downcase =~ /^(?:use[_\-])?mana$/
+	if script.vars[2].downcase == 'on'
+		CharSettings['use_mana'] = true
+		echo "symbol of mana will be used"
+	elsif script.vars[2].downcase == 'off'
+		CharSettings['use_mana'] = false
+		echo "symbol of man will not be used"
 	else
 		echo "You're doing it wrong..."
 	end
@@ -690,6 +716,8 @@ check_mana = proc { |spell, num_multicast|
 	unless spell.affordable?(:multicast => num_multicast) and (spell.mana_cost == 0 or mana >= spell.mana_cost(:multicast => num_multicast) + reserve_mana)
 		sigil_of_power = Spell[9718]
 		sign_of_wracking = Spell[9918]
+        symbol_of_mana = Spell[9813]
+        symbol_of_mana_cooldown = Spell[9048]
 		punishment = Spell[9012]
 		if use_power and sigil_of_power.known? and (spell.mana_cost > 0) and (spell.stamina_cost == 0)
 			until spell.affordable?(:multicast => num_multicast) and (spell.mana_cost == 0 or mana >= spell.mana_cost(:multicast => num_multicast) + reserve_mana)
@@ -702,6 +730,20 @@ check_mana = proc { |spell, num_multicast|
 					wait_until { (spell.affordable?(:multicast => num_multicast) and (spell.mana_cost == 0 or mana >= spell.mana_cost(:multicast => num_multicast) + reserve_mana)) or sigil_of_power.affordable? }
 				end
 			end
+        elsif use_mana and symbol_of_mana.known? and not symbol_of_mana_cooldown.active? and spell.mana_cost > 0
+            until spell.affordable?(:multicast => num_multicast) and (spell.mana_cost == 0 or mana >= spell.mana_cost(:multicast => num_multicast) + reserve_mana)
+                waitrt?
+                waitcastrt?
+                
+                if not symbol_of_mana_cooldown.active?
+                    symbol_of_mana.cast
+                    sleep 0.2
+                else
+					fput 'release' unless checkprep == 'None'
+					echo 'waiting for mana or mana cooldown...'
+					wait_until { (spell.affordable?(:multicast => num_multicast) and (spell.mana_cost == 0 or mana >= spell.mana_cost(:multicast => num_multicast) + reserve_mana)) or sign_of_wracking.affordable? }
+				end
+            end
 		elsif use_wracking and sign_of_wracking.known? and not punishment.active? and (spell.mana_cost > 0)
 			until spell.affordable?(:multicast => num_multicast) and (spell.mana_cost == 0 or mana >= spell.mana_cost(:multicast => num_multicast) + reserve_mana)
 				waitrt?
