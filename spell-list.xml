@@ -1805,8 +1805,11 @@
    <spell availability='all' name='Symbol of Renewal' number='9819' type='utility'>
       <cast-proc>dothistimeout &apos;symbol of renewal&apos;, 5, /^You are already at your maximum spirit level\.|^You call upon the vitality of nature to renew your soul\./</cast-proc>
    </spell>
-   <spell availability='all' name='Symbol of Disruption' number='9820'>
+   <spell availability='all' name='Symbol of Disruption' number='9820' type='offensive'>
       <cast-proc>dothistimeout &apos;symbol of disruption&apos;, 5, /^A churning spectral aura surrounds you/</cast-proc>
+	  <duration span='stackable'>Society.rank / 6.0</duration>
+	  <message type='start'>You feel infused with a collective knowledge on the undead and their weaknesses\.</message>
+      <message type='end'>The rush of collective knowledge of the undead fades from your mind\.</message>
    </spell>
    <spell availability='all' name='Kai&apos;s Smite' number='9821' type='attack'>
       <cast-proc>if defined?(target); if target.class == GameObj; target = &quot; ##{target.id}&quot;; elsif target.class == Fixnum; target = &quot; ##{target}&quot;; else; target = &quot; #{target}&quot;; end; else; target = &quot;&quot;; end; dothistimeout &quot;smite#{target}&quot;, 5, /^You currently have no valid target\.  You will need to specify one\.|doesn&apos;t appear to be suffering from the curse of undeath\.|^You .*?smite/</cast-proc>
