@@ -37,12 +37,12 @@
 	</type>
 	<type name="uncommon">
 		<name>\b(?:adamantine|alexandrite|alum|bronze|carmiln|coraesine|deringo|drakar|drake|eahnor|eonake|faenor|faewood|feras|fireleaf|glaes|glowbark|golvern|gornar|hoarbeam|illthorn|imflass|invar|ipantor|iron|ironwood|kakore|kelyn|krodera|kroderine|laje|lor|mein|mesille|mithglin|mithril|modwir|mossbark|obsidian|ora|orase|razern|rhimar|rolaren|rowan|ruic|sephwir|urglaes|urnon|vaalin|vaalorn|veil|veil iron|veniom|villswood|vultite|widowwood|witchwood|wyrwood|yew|zelnorn|zorchar)\b</name>
-		<exclude>(?:mithril|faenor|rhimar|ora|vultite)\-bloom$| (?:box|chest|coffer|strongbox|trunk|jar)$|^(?:piece of iron|slender mithril wand|twisted modwir short\-staff|flame-singed modwir tree|mithril fang|silver fang|steel fang|iron fang|bronze fang|iron wand|black iron cauldron|sea\-green glaes scarab)$</exclude>
+		<exclude>(?:mithril|faenor|rhimar|ora|vultite)\-bloom$| (?:box|chest|coffer|strongbox|trunk|jar)$|^(?:piece of iron|slender mithril wand|twisted modwir short\-staff|flame-singed modwir tree|mithril fang|silver fang|steel fang|iron fang|bronze fang|iron wand|black iron cauldron|(?:sea\-green|sky\-blue) glaes scarab|green alexandrite stone|piece of spiderweb obsidian)$</exclude>
 	</type>
 	<type name="jewelry">
 		<name>^(?:small crystal\-spoked wheel|dark\-spoked crystalline wheel)$</name>
 		<noun>^(?:pin|necklace|crown|talisman|pendant|ring|tiara|anklet|earring|earrings|clasp|bracelet|medallion|amulet|chalice|stickpin|brooch|badge|circlet|buckle|neckchain|band|earcuff|bracer|bowl|torc|ewer|barrette|flagon|urn|tray|cup|platter|stein)$</noun>
-		<exclude>^(?:dingy|plain|braided|twisted|intricate|large|thin|wide|polished|scratched|thick|dull|faded|small|flawless|inlaid|dirt\-caked|ornate|exquisite) gold ring$|^(?:gold ring|glowing moonstone talisman|mottled malachite talisman)$|^(?:bent|corroded|dented|polished|rusty|scratched|shiny|tarnished) (?:anklet|bracelet|coin|cup|doorknob|earring|fork|horseshoe|medallion|nail|plate|ring|spoon)$</exclude>
+		<exclude>^(?:dingy|plain|braided|twisted|intricate|large|thin|wide|polished|scratched|thick|dull|faded|small|flawless|inlaid|dirt\-caked|ornate|exquisite|shiny) gold ring$|^(?:gold ring|glowing moonstone talisman|mottled malachite talisman)$|^(?:bent|corroded|dented|polished|rusty|scratched|shiny|tarnished) (?:anklet|bracelet|coin|cup|doorknob|earring|fork|horseshoe|medallion|nail|plate|ring|spoon)$</exclude>
 	</type>
 	<type name="junk">
 		<name>^(?:smooth stone|steel shield|scratched steel helm|spirit shard|small block of salt|table leg|some tree bark|piece of iron|moldy bone|chipped brick|some tattered cloth)$|^(?:scratched|corroded|polished|shiny|tarnished|dented|rusty|bent) (?:ring|medallion|earring|anklet|bracelet|fork|plate|coin|cup|nail|spoon|doorknob|horseshoe)$</name>
@@ -52,7 +52,7 @@
 		<noun>^(?:lockpick)$</noun>
 	</type>
 	<type name="magic">
-		<name>^(?:crystal amulet|gold\-framed clear crystal lens|dull gold coin|white flask|impure potion|pure potion|small glowing vial|grot t'kel potion|dirtokh potion|ayveneh potion|shiny vor'taz horn)$|(?:light violet|emerald|reddish-brown|wavering|icy blue|stone grey|amethyst|dark red) sphere$|^(?:dingy|plain|braided|twisted|intricate|large|thin|wide|polished|scratched|thick|dull|faded|small|flawless|inlaid|dirt\-caked|ornate|exquisite) gold ring$|^gold ring$</name>
+		<name>^(?:crystal amulet|gold\-framed clear crystal lens|dull gold coin|white flask|impure potion|pure potion|small glowing vial|grot t'kel potion|dirtokh potion|ayveneh potion|shiny vor'taz horn)$|(?:light violet|emerald|reddish-brown|wavering|icy blue|stone grey|amethyst|dark red) sphere$|^(?:dingy|plain|braided|twisted|intricate|large|thin|wide|polished|scratched|thick|dull|faded|small|flawless|inlaid|dirt\-caked|ornate|exquisite|shiny) gold ring$|^gold ring$</name>
 		<noun>^(?:crystal|statue|filings|triangle|granules|square|cube|sculpture|figurine|prism|statuette|orb|statuette|miniature)$</noun>
 		<exclude>^(?:murky shadowglass orb|chalky yellow cube|glaesine crystal|shard of tigerfang crystal|dark glimmering crystal|dark translucent crystal|diaphanous eight\-sided crystal|rock crystal|quartz crystal|ayanad crystal|s'ayanad crystal|t'ayanad crystal|n'ayanad crystal|golden firemote orb|small crystal flask)$</exclude>
 	</type>
