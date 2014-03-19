@@ -731,7 +731,7 @@ check_mana = proc { |spell, num_multicast|
 				end
 			end
         elsif use_mana and symbol_of_mana.known? and not symbol_of_mana_cooldown.active? and spell.mana_cost > 0
-            until spell.affordable?(:multicast => num_multicast) and (spell.mana_cost == 0 or mana >= spell.mana_cost(:multicast => num_multicast) + reserve_mana)
+            until spell.affordable?(:multicast => num_multicast) and (mana >= spell.mana_cost(:multicast => num_multicast) + reserve_mana)
                 waitrt?
                 waitcastrt?
                 
@@ -741,7 +741,7 @@ check_mana = proc { |spell, num_multicast|
                 else
 					fput 'release' unless checkprep == 'None'
 					echo 'waiting for mana or mana cooldown...'
-					wait_until { (spell.affordable?(:multicast => num_multicast) and (spell.mana_cost == 0 or mana >= spell.mana_cost(:multicast => num_multicast) + reserve_mana)) or sign_of_wracking.affordable? }
+					wait_until { spell.affordable?(:multicast => num_multicast) and (mana >= spell.mana_cost(:multicast => num_multicast) + reserve_mana) }
 				end
             end
 		elsif use_wracking and sign_of_wracking.known? and not punishment.active? and (spell.mana_cost > 0)
