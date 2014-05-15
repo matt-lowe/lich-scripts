@@ -696,7 +696,7 @@ wander_rooms = Array.new
 wander = proc {
 	room = Room.current
 	next_room_options = room.wayto.keys
-	next_room = next_room_options.find_all { |r| (room.timeto[next_room] <= 0.2) and not wander_rooms.include?(r) }
+	next_room = next_room_options.find_all {|r| ((room.timeto[r].class == Float && room.timeto[r] <= 3) or (room.timeto[r].class == Proc && room.timeto[r].call != nil && room.timeto[r].call <= 3)) and not wander_rooms.include?(r)}
 	if next_room.empty?
 		next_room = wander_rooms.find { |r| next_room_options.include?(r) }
 	else
@@ -730,8 +730,8 @@ check_mana = proc { |spell, num_multicast|
 					wait_until { (spell.affordable?(:multicast => num_multicast) and (spell.mana_cost == 0 or mana >= spell.mana_cost(:multicast => num_multicast) + reserve_mana)) or sigil_of_power.affordable? }
 				end
 			end
-        elsif use_mana and symbol_of_mana.known? and not symbol_of_mana_cooldown.active? and spell.mana_cost > 0
-            until spell.affordable?(:multicast => num_multicast) and (spell.mana_cost == 0 or mana >= spell.mana_cost(:multicast => num_multicast) + reserve_mana)
+        elsif use_mana and symbol_of_mana.known? and spell.mana_cost > 0
+            until spell.affordable?(:multicast => num_multicast) and (mana >= spell.mana_cost(:multicast => num_multicast) + reserve_mana)
                 waitrt?
                 waitcastrt?
                 
@@ -741,7 +741,7 @@ check_mana = proc { |spell, num_multicast|
                 else
 					fput 'release' unless checkprep == 'None'
 					echo 'waiting for mana or mana cooldown...'
-					wait_until { (spell.affordable?(:multicast => num_multicast) and (spell.mana_cost == 0 or mana >= spell.mana_cost(:multicast => num_multicast) + reserve_mana)) or sign_of_wracking.affordable? }
+					wait_until { (spell.affordable?(:multicast => num_multicast) and (mana >= spell.mana_cost(:multicast => num_multicast) + reserve_mana)) or not symbol_of_mana_cooldown.active?}
 				end
             end
 		elsif use_wracking and sign_of_wracking.known? and not punishment.active? and (spell.mana_cost > 0)
