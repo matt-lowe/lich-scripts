@@ -352,8 +352,8 @@
       <cost type='mana'>if Spells.cleric &gt;= 40 then 40 elsif Spells.cleric &gt;= 25 then 25 else 18 end</cost>
       <cost type='spirit'>if Spells.cleric &gt;= 40 then 3 elsif Spells.cleric &gt;= 25 then 5 else 8 end</cost>
    </spell>
-   <spell availability='all' name='Divine Wrath' number='319' type='attack'>
-      <cost type='mana'>19</cost>
+   <spell availability='all' name='Divine Wrath' number='335' type='attack'>
+      <cost type='mana'>35</cost>
    </spell>
    <spell availability='all' name='Holy Receptacle' number='325' type='utility'>
       <cost type='mana'>25</cost>
@@ -1970,6 +1970,10 @@
    <spell availability='self-cast' name='Next Bounty' number='9003' type='timer'>
       <duration persist-on-death='yes' real-time='yes'>15</duration>
       <message type='start'>[A-Z][a-z]+ says, &quot;Hmm, I&apos;ve got a task here|^[A-Z][a-z]+ says, &quot;I&apos;ve got a special mission for you.*</message>
+   </spell>
+   <spell availability='self-cast' name='Next Group Bounty' number='9056' type='timer'>
+      <duration persist-on-death='yes' real-time='yes'>15</duration>
+      <message type='start'>[A-Z][a-z]+ turns to you and says, "[A-Z][a-z]+ has signed you up to join (?:him|her) on (?:his|her) task\.  I trust that s?he has adequately informed you of the nature of the task.*</message>
    </spell>
    <spell availability='self-cast' name='Next GoS Task' number='9004' type='timer'>
       <duration>15</duration>
