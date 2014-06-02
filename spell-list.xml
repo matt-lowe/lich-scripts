@@ -261,6 +261,7 @@
       <duration span='refreshable'>0.5</duration>
       <cost type='mana'>40</cost>
       <message type='start'>A small mote of bright white light swirls into existence around you\.</message>
+      <message type='start'>A pulse of bright white light flows from your hand into the mote\.  You feel the spirit's presence grow stronger\.</message>
       <message type='end'>The mote of white light next to you disappears\.</message>
    </spell>
    <spell availability='all' name='Prayer of Holding' number='301' type='attack'>
