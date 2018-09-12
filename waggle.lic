@@ -7,15 +7,46 @@
 	This script is a rewrite of ultrawaggle from SpiffyJr, which is 
 	a heavily modified version of spellup from Shaelun and Blueland.
 
-	Required: Lich 4.4.6
+	  author: Tillmen (tillmen@lichproject.org)
+	    game: Gemstone
+	    tags: magic
+	required: Lich >= 4.4.6
+	 version: 0.12
 
-	https://github.com/matt-lowe/lich-scripts
-	tillmen@lichproject.org
+	changelog:
+		0.12 (2018-04-20):
+         fix --refreshable-min command line option
+		0.11 (2015-11-25):
+			fix max_multicast formula for bards
+		0.10 (2015-06-08):
+			fix multicast duration tracking (the cast every spell once and exit bug)
+
+=end
+=begin
+
+		0.9 (2015-05-20):
+			add option to skip short duration spells on others
+			add option to use symbol of mana (Drafix)
+		0.8 (2015-04-20):
+			don't "cast <target> 1" for 1 multicast
+		0.7 (2015-03-31):
+			fix bug where wracking/power was used when there wasn't enough spirit/stamina for a sign/sigil
+		0.6 (2015-01-30):
+			do one cast of each stackable spell per round until spelled up, unless rapid-fire is active
+		0.5 (2014-10-16):
+			fix max_multicast bug
+		0.4 (2014-10-05):
+			typo
+		0.3 (2014-10-05):
+			fix (maybe) max_multicast
+		0.2 (2014-10-05):
+			fix wander-to-wrack option
 
 =end
 
+# fixme: option to cast high level spells first
 # fixme: armor specialization
-# fixme: eat bread
+# fixme: option to not cast low duration spells on others
 
 start_at          = CharSettings['start_at']          || 180
 stop_at           = CharSettings['stop_at']           || 180
@@ -30,10 +61,13 @@ use_power         = CharSettings['use_power']         || false
 use_mana          = CharSettings['use_mana']          || false
 use_concentration = CharSettings['use_concentration'] || false
 skip_jerks        = CharSettings['skip_jerks']        || false
+skip_short_spells = CharSettings['skip_short_spells'] || false
 reserve_mana      = CharSettings['reserve_mana']      || 0
 retribution_spell = CharSettings['retribution_spell']
 cast_list         = CharSettings['cast_list']         || [ 101, 102, 103, 107, 115, 120, 202, 211, 215, 219, 303, 307, 310, 313, 401, 406, 414, 425, 430, 503, 507, 508, 509, 513, 520, 601, 602, 606, 613, 617, 618, 625, 640, 712, 905, 911, 913, 920, 1109, 1119, 1125, 1130, 1601, 1603, 1606, 1610, 1611, 1612, 1616 ]
 did_something     = false
+fix_setting       = { 'on' => true, 'off' => false }
+short_spell_time  = 3
 
 if setting = script.vars.find { |var| var =~ /^\-\-start[_\-]at=[0-9]+$/ }
 	start_at = setting.slice(/[0-9]+/).to_i
@@ -47,7 +81,7 @@ if setting = script.vars.find { |var| var =~ /^\-\-stop[_\-]before=[0-9]+$/ }
 	stop_before = setting.slice(/[0-9]+/).to_i
 	script.vars.delete(setting)
 end
-if setting = script.vars.find { |var| var =~ /^\-\-unstackable[_\-]min=[0-9]+$/ }
+if setting = script.vars.find { |var| var =~ /^\-\-(?:unstackable|refreshable)[_\-]min=[0-9]+$/ }
 	unstackable_min = setting.slice(/[0-9]+/).to_i
 	script.vars.delete(setting)
 end
@@ -56,38 +90,35 @@ if setting = script.vars.find { |var| var =~ /^\-\-cast[_\-]list=[0-9,]+$/ }
 	script.vars.delete(setting)
 end
 if setting = script.vars.find { |var| var =~ /^\-\-use[_\-]multicast=(?:on|off)$/ }
-	fix_setting = { 'on' => true, 'off' => false }
 	use_multicast = fix_setting[setting.slice(/on|off/)]
 	script.vars.delete(setting)
 end
 if setting = script.vars.find { |var| var =~ /^\-\-use[_\-]wracking=(?:on|off)$/ }
-	fix_setting = { 'on' => true, 'off' => false }
 	use_wracking = fix_setting[setting.slice(/on|off/)]
 	script.vars.delete(setting)
 end
 if setting = script.vars.find { |var| var =~ /^\-\-wander[_\-]to[_\-]wrack=(?:on|off)$/ }
-	fix_setting = { 'on' => true, 'off' => false }
 	wander_to_wrack = fix_setting[setting.slice(/on|off/)]
 	script.vars.delete(setting)
 end
 if setting = script.vars.find { |var| var =~ /^\-\-use[_\-]power=(?:on|off)$/ }
-	fix_setting = { 'on' => true, 'off' => false }
 	use_power = fix_setting[setting.slice(/on|off/)]
 	script.vars.delete(setting)
 end
-if setting = script.vars.find { |var| var =~ /^\-\-use[_\-]concentration=(?:on|off)$/ }
-	fix_setting = { 'on' => true, 'off' => false }
-	use_concentration = fix_setting[setting.slice(/on|off/)]
-	script.vars.delete(setting)
-end
 if setting = script.vars.find { |var| var =~ /^\-\-use[_\-]mana=(?:on|off)$/ }
-	fix_setting = { 'on' => true, 'off' => false }
 	use_mana = fix_setting[setting.slice(/on|off/)]
 	script.vars.delete(setting)
 end
+if setting = script.vars.find { |var| var =~ /^\-\-use[_\-]concentration=(?:on|off)$/ }
+	use_concentration = fix_setting[setting.slice(/on|off/)]
+	script.vars.delete(setting)
+end
 if setting = script.vars.find { |var| var =~ /^\-\-skip[_\-]jerks=(?:on|off)$/ }
-	fix_setting = { 'on' => true, 'off' => false }
 	skip_jerks = fix_setting[setting.slice(/on|off/)]
+	script.vars.delete(setting)
+end
+if setting = script.vars.find { |var| var =~ /^\-\-skip[_\-]short(?:[_\-]spells)?=(?:on|off)$/ }
+	skip_short_spells = fix_setting[setting.slice(/on|off/)]
 	script.vars.delete(setting)
 end
 if setting = script.vars.find { |var| var =~ /^\-\-retribution[_\-]spell=(?:[0-9]+|off)$/ }
@@ -107,9 +138,10 @@ if script.vars.include?('--save')
 	CharSettings['use_multicast']     = use_multicast
 	CharSettings['wander_to_wrack']   = wander_to_wrack
 	CharSettings['use_power']         = use_power
-    CharSettings['use_mana']          = use_mana
+	CharSettings['use_mana']          = use_mana
 	CharSettings['use_concentration'] = use_concentration
 	CharSettings['skip_jerks']        = skip_jerks
+	CharSettings['skip_short_spells'] = skip_short_spells
 	CharSettings['start_at']          = start_at
 	CharSettings['stop_at']           = stop_at
 	CharSettings['stop_before']       = stop_before
@@ -146,9 +178,10 @@ elsif script.vars[1].downcase == 'help'
 	respond "   #{$clean_lich_char}#{script.name} wracking [on/off]           use sign of wracking when out of mana"
 	respond "   #{$clean_lich_char}#{script.name} wander [on/off]             wander up to 20 rooms to find an empty room to wrack in and return"
 	respond "   #{$clean_lich_char}#{script.name} power [on/off]              use sigil of power when out of mana"
-    respond "   #{$clean_lich_char}#{script.name} mana [on/off]               use sigil of mana when out of mana"
-	respond "   #{$clean_lich_char}#{script.name} concentration [on/off]      use sigil of power when out of mana"
+	respond "   #{$clean_lich_char}#{script.name} concentration [on/off]      use sigil of concentration when out of mana"
+	respond "   #{$clean_lich_char}#{script.name} mana [on/off]               use symbol of mana when out of mana"
 	respond "   #{$clean_lich_char}#{script.name} skip-jerks [on/off]         skip targets that don't share their current spell durations"
+	respond "   #{$clean_lich_char}#{script.name} skip-short-spells [on/off]  don't cast spells with a duration less than #{short_spell_time} minutes on others"
 	respond "   #{$clean_lich_char}#{script.name} retribution-spell [#|none]  spell number for chant retribution after casting cloak of shadows"
 	respond
 	respond "   #{$clean_lich_char}#{script.name}                             spell yourself up"
@@ -158,7 +191,7 @@ elsif script.vars[1].downcase == 'help'
 	respond
 	respond "   Any or all saved options can be overridden on the command line without being saved using the following syntax:"
 	respond
-	respond "   #{$clean_lich_char}#{script.name} --cast-list=401,406,503 --start-at=60 --stop-at=120 --stop-before=250 --refreshable-min=10 --use-wracking=on --wander-to-wrack=on --use-power=off --use-mana=off --use-concentration=off --skip-jerks=on --retribution-spell=717 Jim Joe Bob"
+	respond "   #{$clean_lich_char}#{script.name} --cast-list=401,406,503 --start-at=60 --stop-at=120 --stop-before=250 --refreshable-min=10 --use-wracking=on --wander-to-wrack=on --use-power=off --use-concentration=off --use-mana=off --skip-jerks=on --skip-short-spells=on --retribution-spell=717 Jim Joe Bob"
 	respond
 	exit
 elsif script.vars[1] =~ /^setup$|^options$/i
@@ -217,21 +250,26 @@ elsif script.vars[1] =~ /^setup$|^options$/i
 			stop_before_entry.width_request = 50
 
 			stack_box = Gtk::VBox.new(false, 0)
+
 			temp_box = Gtk::HBox.new(false, 0)
 			temp_box.pack_end(start_at_entry, false, false, 5)
 			temp_box.pack_end(start_at_label, false, false, 5)
 			stack_box.pack_start(temp_box, false, false, 5)
+
 			temp_box = Gtk::HBox.new(false, 0)
 			temp_box.pack_end(stop_at_entry, false, false, 5)
 			temp_box.pack_end(stop_at_label, false, false, 5)
 			stack_box.pack_start(temp_box, false, false, 5)
+
 			temp_box = Gtk::HBox.new(false, 0)
 			temp_box.pack_end(stop_before_entry, false, false, 5)
 			temp_box.pack_end(stop_before_label, false, false, 5)
 			stack_box.pack_start(temp_box, false, false, 5)
-			stack_frame = Gtk::Frame.new('Stackable Spells')
+
 			stack_box_spacer = Gtk::VBox.new
 			stack_box_spacer.pack_start(stack_box, false, false, 4)
+
+			stack_frame = Gtk::Frame.new('Stackable Spells')
 			stack_frame.add(stack_box_spacer)
 
 			nonstack_min_label = Gtk::Label.new('   Minimum:')
@@ -247,33 +285,7 @@ elsif script.vars[1] =~ /^setup$|^options$/i
 			nonstack_frame = Gtk::Frame.new('Non-stackable Spells')
 			nonstack_frame.add(nonstack_box_spacer)
 
-			left_box = Gtk::VBox.new(false, 0)
-			left_box.pack_start(stack_frame, false, false, 5)
-			left_box.pack_start(nonstack_frame, false, false, 5)
-
-			use_multicast_option = Gtk::CheckButton.new('multicast')
-			use_multicast_option.active = use_multicast
-			use_wracking_option = Gtk::CheckButton.new('wracking')
-			use_wracking_option.active = use_wracking
-			wander_to_wrack_option = Gtk::CheckButton.new('wander to wrack')
-			wander_to_wrack_option.active = wander_to_wrack
-			use_power_option = Gtk::CheckButton.new('power')
-            use_power_option.active = use_power
-            use_mana_option = Gtk::CheckButton.new('mana')
-			use_mana_option.active = use_mana
-			use_concentration_option = Gtk::CheckButton.new('concentration')
-			use_concentration_option.active = use_concentration
-			skip_jerks_option = Gtk::CheckButton.new('skip jerks')
-			skip_jerks_option.active = skip_jerks
-
-			option_box = Gtk::VBox.new(false, 0)
-			option_box.pack_start(use_multicast_option, false, false, 4)
-			option_box.pack_start(use_wracking_option, false, false, 4)
-			option_box.pack_start(wander_to_wrack_option, false, false, 4)
-			option_box.pack_start(use_power_option, false, false, 4)
-            option_box.pack_start(use_mana_option, false, false, 4)
-			option_box.pack_start(use_concentration_option, false, false, 4)
-			option_box.pack_start(skip_jerks_option, false, false, 4)
+			other_option_box = Gtk::VBox.new(false, 0)
 
 			retribution_spell_label = Gtk::Label.new('retribution spell:')
 			retribution_spell_entry = Gtk::Entry.new
@@ -282,7 +294,7 @@ elsif script.vars[1] =~ /^setup$|^options$/i
 			temp_box = Gtk::HBox.new(false, 0)
 			temp_box.pack_end(retribution_spell_entry, false, false, 5)
 			temp_box.pack_end(retribution_spell_label, false, false, 5)
-			option_box.pack_start(temp_box, false, false, 4)
+			other_option_box.pack_start(temp_box, false, false, 4)
 
 			reserve_mana_label = Gtk::Label.new('reserve mana:')
 			reserve_mana_entry = Gtk::Entry.new
@@ -291,7 +303,45 @@ elsif script.vars[1] =~ /^setup$|^options$/i
 			temp_box = Gtk::HBox.new(false, 0)
 			temp_box.pack_end(reserve_mana_entry, false, false, 5)
 			temp_box.pack_end(reserve_mana_label, false, false, 5)
-			option_box.pack_start(temp_box, false, false, 4)
+			other_option_box.pack_start(temp_box, false, false, 4)
+
+			other_option_box_spacer = Gtk::VBox.new
+			other_option_box_spacer.pack_start(other_option_box, false, false, 4)
+
+			other_option_frame = Gtk::Frame.new('Options')
+			other_option_frame.add(other_option_box_spacer)
+
+			left_box = Gtk::VBox.new(false, 0)
+			left_box.pack_start(stack_frame, false, false, 5)
+			left_box.pack_start(nonstack_frame, false, false, 5)
+			left_box.pack_start(other_option_frame, false, false, 5)
+
+			use_multicast_option            = Gtk::CheckButton.new('multicast')
+			use_multicast_option.active     = use_multicast
+			use_wracking_option             = Gtk::CheckButton.new('wracking')
+			use_wracking_option.active      = use_wracking
+			wander_to_wrack_option          = Gtk::CheckButton.new('wander to wrack')
+			wander_to_wrack_option.active   = wander_to_wrack
+			use_power_option                = Gtk::CheckButton.new('power')
+			use_power_option.active         = use_power
+			use_concentration_option        = Gtk::CheckButton.new('concentration')
+			use_concentration_option.active = use_concentration
+			use_mana_option                 = Gtk::CheckButton.new('mana')
+			use_mana_option.active          = use_mana 
+			skip_jerks_option               = Gtk::CheckButton.new('skip jerks')
+			skip_jerks_option.active        = skip_jerks
+			skip_short_option               = Gtk::CheckButton.new('skip short spells on others')
+			skip_short_option.active        = skip_short_spells
+
+			option_box = Gtk::VBox.new(false, 0)
+			option_box.pack_start(use_multicast_option, false, false, 4)
+			option_box.pack_start(use_wracking_option, false, false, 4)
+			option_box.pack_start(wander_to_wrack_option, false, false, 4)
+			option_box.pack_start(use_power_option, false, false, 4)
+			option_box.pack_start(use_concentration_option, false, false, 4)
+			option_box.pack_start(use_mana_option, false, false, 4)
+			option_box.pack_start(skip_jerks_option, false, false, 4)
+			option_box.pack_start(skip_short_option, false, false, 4)
 
 			option_box_spacer = Gtk::VBox.new
 			option_box_spacer.pack_start(option_box, false, false, 4)
@@ -301,8 +351,11 @@ elsif script.vars[1] =~ /^setup$|^options$/i
 
 			columns = Gtk::HBox.new(true, 0)
 
+			right_box = Gtk::VBox.new
+			right_box.pack_start(option_frame, false, false, 0)
+
 			columns.pack_start(left_box, false, false, 0)
-			columns.pack_start(option_frame, false, false, 0)
+			columns.pack_start(right_box, false, false, 0)
 
 			save_button = Gtk::Button.new('Ok')
 			save_button.width_request = 75
@@ -429,16 +482,17 @@ elsif script.vars[1] =~ /^setup$|^options$/i
 					else
 						respond "[waggle: ignoring invalid entry: #{reserve_mana_entry.text}]"
 					end
-					use_multicast = use_multicast_option.active?
-					use_wracking = use_wracking_option.active?
-					wander_to_wrack = wander_to_wrack_option.active?
-					use_power = use_power_option.active?
-                    use_mana = use_mana_option.active?
+					use_multicast     = use_multicast_option.active?
+					use_wracking      = use_wracking_option.active?
+					wander_to_wrack   = wander_to_wrack_option.active?
+					use_power         = use_power_option.active?
 					use_concentration = use_concentration_option.active?
-					skip_jerks = skip_jerks_option.active?
-					window_width = window.allocation.width
-					window_height = window.allocation.height
-					window_action = :save
+					use_mana          = use_mana_option.active?
+					skip_jerks        = skip_jerks_option.active?
+					skip_short_spells = skip_short_option.active?
+					window_width      = window.allocation.width
+					window_height     = window.allocation.height
+					window_action     = :save
 				}
 			}
 			window.signal_connect('delete_event') {
@@ -460,9 +514,10 @@ elsif script.vars[1] =~ /^setup$|^options$/i
 			CharSettings['use_wracking']      = use_wracking
 			CharSettings['wander_to_wrack']   = wander_to_wrack
 			CharSettings['use_power']         = use_power
-            CharSettings['use_mana']          = use_mana
 			CharSettings['use_concentration'] = use_concentration
+			CharSettings['use_mana']          = use_mana
 			CharSettings['skip_jerks']        = skip_jerks
+			CharSettings['skip_short_spells'] = skip_short_spells
 			CharSettings['start_at']          = start_at
 			CharSettings['stop_at']           = stop_at
 			CharSettings['stop_before']       = stop_before
@@ -515,9 +570,10 @@ elsif script.vars[1] =~ /^list$|^show$/i
 	respond "      sign of wracking: #{fix_setting[use_wracking]}"
 	respond "       wander to wrack: #{fix_setting[wander_to_wrack]}"
 	respond "        sigil of power: #{fix_setting[use_power]}"
-    respond "        symbol of mana: #{fix_setting[use_mana]}"
 	respond "sigil of concentration: #{fix_setting[use_concentration]}"
+	respond "        symbol of mana: #{fix_setting[use_mana]}"
 	respond "            skip jerks: #{fix_setting[skip_jerks]}"
+	respond "     skip short spells: #{fix_setting[skip_short_spells]}"
 	respond "     retribution spell: #{retribution_spell || 'none'}"
 	respond "          reserve mana: #{reserve_mana}"
 	respond
@@ -598,17 +654,6 @@ elsif script.vars[1].downcase =~ /^(?:use[_\-])?power$/
 		echo "You're doing it wrong..."
 	end
 	exit
-elsif script.vars[1].downcase =~ /^(?:use[_\-])?mana$/
-	if script.vars[2].downcase == 'on'
-		CharSettings['use_mana'] = true
-		echo "symbol of mana will be used"
-	elsif script.vars[2].downcase == 'off'
-		CharSettings['use_mana'] = false
-		echo "symbol of man will not be used"
-	else
-		echo "You're doing it wrong..."
-	end
-	exit
 elsif script.vars[1].downcase =~ /^(?:use[_\-])?concentration$/
 	if script.vars[2].downcase == 'on'
 		CharSettings['use_concentration'] = true
@@ -620,6 +665,17 @@ elsif script.vars[1].downcase =~ /^(?:use[_\-])?concentration$/
 		echo "You're doing it wrong..."
 	end
 	exit
+elsif script.vars[1].downcase =~ /^(?:use[_\-])?mana$/
+	if script.vars[2].downcase == 'on'
+		CharSettings['use_mana'] = true
+		echo "symbol of mana will be used"
+	elsif script.vars[2].downcase == 'off'
+		CharSettings['use_mana'] = false
+		echo "symbol of man will not be used"
+	else
+		echo "You're doing it wrong..."
+	end
+	exit
 elsif script.vars[1].downcase =~ /^skip[_\-]jerks$/
 	if script.vars[2].downcase == 'on'
 		CharSettings['skip_jerks'] = true
@@ -627,6 +683,17 @@ elsif script.vars[1].downcase =~ /^skip[_\-]jerks$/
 	elsif script.vars[2].downcase == 'off'
 		CharSettings['skip_jerks'] = false
 		echo "jerks that don't share spell durations will not be skipped"
+	else
+		echo "You're doing it wrong..."
+	end
+	exit
+elsif script.vars[1].downcase =~ /^skip[_\-]short(?:[_\-]spells)?/
+	if script.vars[2].downcase == 'on'
+		CharSettings['skip_short_spells'] = true
+		echo "spells with a duration of less than #{short_spell_time} minutes per cast will not be cast on others"
+	elsif script.vars[2].downcase == 'off'
+		CharSettings['skip_short_spells'] = false
+		echo "short spells will not be skipped"
 	else
 		echo "You're doing it wrong..."
 	end
@@ -696,7 +763,7 @@ wander_rooms = Array.new
 wander = proc {
 	room = Room.current
 	next_room_options = room.wayto.keys
-	next_room = next_room_options.find_all {|r| ((room.timeto[r].class == Float && room.timeto[r] <= 3) or (room.timeto[r].class == Proc && room.timeto[r].call != nil && room.timeto[r].call <= 3)) and not wander_rooms.include?(r)}
+	next_room = next_room_options.find_all { |r| ((room.timeto[r].class == Float && room.timeto[r] <= 3) or (room.timeto[r].class == Proc && room.timeto[r].call != nil && room.timeto[r].call <= 3)) and not wander_rooms.include?(r)}
 	if next_room.empty?
 		next_room = wander_rooms.find { |r| next_room_options.include?(r) }
 	else
@@ -713,39 +780,39 @@ wander = proc {
 }
 
 check_mana = proc { |spell, num_multicast|
-	unless spell.affordable?(:multicast => num_multicast) and (spell.mana_cost == 0 or mana >= spell.mana_cost(:multicast => num_multicast) + reserve_mana)
-		sigil_of_power = Spell[9718]
-		sign_of_wracking = Spell[9918]
-        symbol_of_mana = Spell[9813]
-        symbol_of_mana_cooldown = Spell[9048]
-		punishment = Spell[9012]
-		if use_power and sigil_of_power.known? and (spell.mana_cost > 0) and (spell.stamina_cost == 0)
-			until spell.affordable?(:multicast => num_multicast) and (spell.mana_cost == 0 or mana >= spell.mana_cost(:multicast => num_multicast) + reserve_mana)
+	unless spell.affordable?(:multicast => num_multicast) and ((spell.mana_cost == 0) or (mana >= spell.mana_cost(:multicast => num_multicast) + reserve_mana))
+		sigil_of_power          = Spell[9718]
+		sign_of_wracking        = Spell[9918]
+		symbol_of_mana          = Spell[9813]
+		symbol_of_mana_cooldown = Spell[9048]
+		punishment              = Spell[9012]
+		if use_power and sigil_of_power.known? and (spell.mana_cost > 0) and (mana < (spell.mana_cost(:multicast => num_multicast) + reserve_mana)) and (spell.stamina_cost == 0)
+			until spell.affordable?(:multicast => num_multicast) and (mana >= spell.mana_cost(:multicast => num_multicast) + reserve_mana)
 				if sigil_of_power.affordable?
 					sigil_of_power.cast
 					sleep 0.2
 				else
 					fput 'release' unless checkprep == 'None'
-					echo 'waiting for mana or stamina...'
-					wait_until { (spell.affordable?(:multicast => num_multicast) and (spell.mana_cost == 0 or mana >= spell.mana_cost(:multicast => num_multicast) + reserve_mana)) or sigil_of_power.affordable? }
+					echo 'waiting for mana...'
+					wait_until { (spell.affordable?(:multicast => num_multicast) and (mana >= spell.mana_cost(:multicast => num_multicast) + reserve_mana)) or sigil_of_power.affordable? }
 				end
 			end
-        elsif use_mana and symbol_of_mana.known? and spell.mana_cost > 0
-            until spell.affordable?(:multicast => num_multicast) and (mana >= spell.mana_cost(:multicast => num_multicast) + reserve_mana)
-                waitrt?
-                waitcastrt?
-                
-                if not symbol_of_mana_cooldown.active?
-                    symbol_of_mana.cast
-                    sleep 0.2
-                else
+		elsif use_mana and symbol_of_mana.known? and spell.mana_cost > 0
+			until spell.affordable?(:multicast => num_multicast) and (mana >= spell.mana_cost(:multicast => num_multicast) + reserve_mana)
+				waitrt?
+				waitcastrt?
+				if not symbol_of_mana_cooldown.active?
+					# fixme: might spam if out of favor
+					symbol_of_mana.cast
+					sleep 0.2
+				else
 					fput 'release' unless checkprep == 'None'
 					echo 'waiting for mana or mana cooldown...'
-					wait_until { (spell.affordable?(:multicast => num_multicast) and (mana >= spell.mana_cost(:multicast => num_multicast) + reserve_mana)) or not symbol_of_mana_cooldown.active?}
+					wait_until { (spell.affordable?(:multicast => num_multicast) and (mana >= spell.mana_cost(:multicast => num_multicast) + reserve_mana)) or not symbol_of_mana_cooldown.active? }
 				end
-            end
-		elsif use_wracking and sign_of_wracking.known? and not punishment.active? and (spell.mana_cost > 0)
-			until spell.affordable?(:multicast => num_multicast) and (spell.mana_cost == 0 or mana >= spell.mana_cost(:multicast => num_multicast) + reserve_mana)
+			end
+		elsif use_wracking and sign_of_wracking.known? and not punishment.active? and (spell.mana_cost > 0) and (mana < (spell.mana_cost(:multicast => num_multicast) + reserve_mana))
+			until spell.affordable?(:multicast => num_multicast) and (mana >= spell.mana_cost(:multicast => num_multicast) + reserve_mana)
 				waitrt?
 				waitcastrt?
 				if sign_of_wracking.affordable? and not punishment.active? 
@@ -828,7 +895,7 @@ cast_spell = proc { |spell, target, num_multicast|
 			if num_multicast > 1
 				cast_result = spell.cast("at #{target} #{num_multicast}")
 			else
-				cast_result = spell.cast("at #{target} #{num_multicast}")
+				cast_result = spell.cast("at #{target}")
 			end
 		end
 		if cast_result =~ /^Be at peace my child, there is no need for spells of war in here\.$|Spells of War cannot be cast/
@@ -857,12 +924,28 @@ get_target_info = proc { |target|
 
 max_multicast = proc{ |spell|
 	ranks = 0
-	if [4, 5, 9].include?(spell.circle.to_i)
-		ranks = Skills.emc + ([Skills.smc, Skills.mmc].max / 2)
-	elsif [1, 2, 3, 6, 16, 11].include?(spell.circle.to_i) 
-		ranks = Skills.smc + ([Skills.emc, Skills.mmc].max / 2)
-	elsif spell.circle.to_i == 7
-		ranks = [Skills.emc,Skills.smc].max + ([Skills.emc,Skills.smc].min / 2)
+	if Char.prof == 'Wizard'
+		ranks = Skills.emc
+	elsif Char.prof =~ /^Cleric$|^Ranger$|^Paladin$/
+		ranks = Skills.smc
+	elsif Char.prof =~ /^Empath$|^Monk$|^Bard$/
+		if [1,2].include?(spell.circle.to_i)
+			ranks = Skills.smc + (Skills.mmc / 2)
+		elsif spell.circle.to_i == 11
+			ranks = [Skills.mmc,Skills.smc].max + ([Skills.mmc,Skills.smc].min / 2)
+		elsif spell.circle.to_i == 12
+			ranks = Skills.mmc + (Skills.smc / 2)
+		elsif spell.circle.to_i == 4
+			ranks = Skills.emc + (Skills.mmc / 2)
+		end
+	elsif Char.prof =~ /^Sorcerer$|^Warrior$|^Rogue$/
+		if spell.circle.to_i == 4
+			ranks = Skills.emc + (Skills.smc / 2)
+		elsif spell.circle.to_i == 1
+			ranks = Skills.smc + (Skills.emc / 2)
+		elsif spell.circle.to_i == 7
+			ranks = [Skills.emc,Skills.smc].max + ([Skills.emc,Skills.smc].min / 2)
+		end
 	end
 	(ranks / 25) + 1
 }
@@ -898,6 +981,7 @@ if list_mode
 		target_info.keys.each { |name|
 			next unless spell.stackable?(:target => name)
 			next unless spell.available?(:target => name)
+			next unless spell.time_per(:target => name) > short_spell_time
 			next if (name == Char.name) and (spell.circlename == 'Bard') and spell.active?
 			target_info[name][spell.num.to_s] ||= 0
 			dry_run[name] ||= Hash.new
@@ -914,6 +998,7 @@ if list_mode
 		target_info.keys.each { |name|
 			next unless spell.refreshable?(:target => name)
 			next unless spell.available?(:target => name)
+			next unless spell.time_per(:target => name) > short_spell_time
 			next if (name == Char.name) and (spell.circlename == 'Bard') and spell.active?
 			target_info[name][spell.num.to_s] ||= 0
 			if (target_info[name][spell.num.to_s] < refreshable_min)
@@ -926,6 +1011,7 @@ if list_mode
 		target_info.keys.each { |name|
 			next if spell.stackable?(:target => name) or spell.refreshable?(:target => name)
 			next unless spell.available?(:target => name)
+			next unless spell.time_per(:target => name) > short_spell_time
 			next if (name == Char.name) and (spell.circlename == 'Bard') and spell.active?
 			target_info[name][spell.num.to_s] ||= 0
 			unless target_info[name][spell.num.to_s] > 0
@@ -973,78 +1059,107 @@ else
 		cast_list.delete(625)
 		cast_list.unshift(625)
 	end
-	skip_targets = Array.new
-	skip_spells = Array.new
+	skip_targets   = Array.new
+	skip_spells    = Array.new
+	did_first_cast = Hash.new
 	#
 	# cast stackable spells
 	#
-	cast_list.each { |spell|
-		if use_concentration and (sigil_of_concentration = Spell[9714])
-			sigil_of_concentration.cast if sigil_of_concentration.known? and sigil_of_concentration.affordable? and not sigil_of_concentration.active?
-		end
-		spell = fix_spell.call(spell)
-		target_info.keys.each { |name|
-			next unless spell.stackable?(:target => name)
-			next unless spell.available?(:target => name)
-			next if skip_targets.include?(name) or skip_spells.include?(spell.num)
-			next if (name == Char.name) and (spell.circlename == 'Bard') and spell.active?
-			target_info[name][spell.num.to_s] ||= 0
-			if target_info[name][spell.num.to_s] < start_at
-				if use_multicast and spell.multicastable?
-					multicast_num = 0
-					need_chant = false
-					while ( (target_info[name][spell.num.to_s] < stop_at) and (target_info[name][spell.num.to_s] + spell.time_per(:target => name)) < stop_before )
-						need_chant = true if (spell.num == 712) and (name == Char.name)
-						multicast_num += 1
-						target_info[name][spell.num.to_s] += spell.time_per(:target => name)
-					end
-					(multicast_num / max_multicast.call(spell)).times {
-						cast_result = cast_spell.call(spell, name, max_multicast.call(spell))
-						if cast_result == :bad_spell
-							skip_spells.push(spell.num)
-							break
-						elsif cast_result == :bad_target
-							skip_targets.push(name)
-							break
-						end
-					}
-					unless ((multicast_num % max_multicast.call(spell)) < 1) or skip_targets.include?(name) or skip_spells.include?(spell.num)
-						cast_result = cast_spell.call(spell, name, (multicast_num % max_multicast.call(spell)))
-						if cast_result == :bad_spell
-							skip_spells.push(spell.num)
-						elsif cast_result == :bad_target
-							skip_targets.push(name)
-						end
-					end
-				else
-					need_chant = false
-					while ( (target_info[name][spell.num.to_s] < stop_at) and (target_info[name][spell.num.to_s] + spell.time_per(:target => name)) < stop_before )
-						need_chant = true if (spell.num == 712) and (name == Char.name)
-						empty_hand if spell.num == 203
-						cast_result = cast_spell.call(spell, name, 1)
-						if spell.num == 203
-							if bread = [ GameObj.right_hand, GameObj.left_hand ].find { |obj| obj.noun =~ /^(?:flatbread|teacake|crisps|cake|waybread|biscuit|oatcake|fritter|loaf|ball|cornmeal|wheatberries|cracker|dumpling|bread|tart|dough|seeds)$/ }
-								5.times { fput "eat ##{bread.id}" }
-							end
-							fill_hand
-							break
-						end
-						if cast_result == :bad_spell
-							skip_spells.push(spell.num)
-							break
-						elsif cast_result == :bad_target
-							skip_targets.push(name)
-							break
-						end
-						target_info[name][spell.num.to_s] += spell.time_per(:target => name)
-					end
-				end
-				if need_chant and retribution_spell
-					fput "chant retribution #{retribution_spell}"
-				end
+	loop {
+		did_cast = false
+		have_rapid = Spell[515].active?
+		cast_list.each { |spell|
+			if use_concentration and (sigil_of_concentration = Spell[9714])
+				sigil_of_concentration.cast if sigil_of_concentration.known? and sigil_of_concentration.affordable? and not sigil_of_concentration.active?
 			end
+			spell = fix_spell.call(spell)
+			target_info.keys.each { |name|
+				next unless spell.stackable?(:target => name)
+				next unless spell.available?(:target => name)
+				next unless spell.time_per(:target => name) > short_spell_time
+				next if skip_targets.include?(name) or skip_spells.include?(spell.num)
+				next if (name == Char.name) and (spell.circlename == 'Bard') and spell.active?
+				target_info[name][spell.num.to_s] ||= 0
+				did_first_cast[name] ||= Hash.new
+				if (target_info[name][spell.num.to_s] < start_at) or did_first_cast[name][spell.num.to_s]
+					did_first_cast[name][spell.num.to_s] = true
+					if use_multicast and spell.multicastable?
+						multicast_num = 0
+						need_chant = false
+						dur = target_info[name][spell.num.to_s]
+						while ( (dur < stop_at) and (dur + spell.time_per(:target => name)) < stop_before )
+							dur += spell.time_per(:target => name)
+							multicast_num += 1
+							need_chant = true if (spell.num == 712) and (name == Char.name)
+						end
+						did_multicast = false
+						(multicast_num / max_multicast.call(spell)).times {
+							cast_result = cast_spell.call(spell, name, max_multicast.call(spell))
+							target_info[name][spell.num.to_s] += (spell.time_per(:target => name) * max_multicast.call(spell))
+							if cast_result == :bad_spell
+								skip_spells.push(spell.num)
+								break
+							elsif cast_result == :bad_target
+								skip_targets.push(name)
+								break
+							else
+								did_cast = true
+							end
+							did_multicast = true
+							break unless have_rapid
+						}
+						if have_rapid or not did_multicast
+							unless ((multicast_num % max_multicast.call(spell)) < 1) or skip_targets.include?(name) or skip_spells.include?(spell.num)
+								cast_result = cast_spell.call(spell, name, (multicast_num % max_multicast.call(spell)))
+								target_info[name][spell.num.to_s] += (spell.time_per(:target => name) * (multicast_num % max_multicast.call(spell)))
+								if cast_result == :bad_spell
+									skip_spells.push(spell.num)
+								elsif cast_result == :bad_target
+									skip_targets.push(name)
+								else
+									did_cast = true
+								end
+							end
+						end
+					else
+						need_chant = false
+						while ( (target_info[name][spell.num.to_s] < stop_at) and (target_info[name][spell.num.to_s] + spell.time_per(:target => name)) < stop_before )
+							need_chant = true if (spell.num == 712) and (name == Char.name)
+							empty_hand if spell.num == 203
+							cast_result = cast_spell.call(spell, name, 1)
+							if spell.num == 203
+								if bread = [ GameObj.right_hand, GameObj.left_hand ].find { |obj| obj.noun =~ /^(?:flatbread|teacake|crisps|cake|waybread|biscuit|oatcake|fritter|loaf|ball|cornmeal|wheatberries|cracker|dumpling|bread|tart|dough|seeds)$/ }
+									if name == Char.name
+										5.times { fput "eat ##{bread.id}" }
+									else
+										fput "drop ##{bread.id}"
+									end
+								end
+								fill_hand
+								break
+							end
+							if cast_result == :bad_spell
+								skip_spells.push(spell.num)
+								break
+							elsif cast_result == :bad_target
+								skip_targets.push(name)
+								break
+							else
+								did_cast = true
+							end
+							target_info[name][spell.num.to_s] += spell.time_per(:target => name)
+							break unless have_rapid
+						end
+					end
+					if need_chant and retribution_spell
+						fput "chant retribution #{retribution_spell}"
+					end
+				end
+			}
+			release_spell.call
 		}
-		release_spell.call
+		break unless did_cast
+		break if have_rapid
 	}
 	
 	#
@@ -1058,6 +1173,7 @@ else
 		target_info.keys.each { |name|
 			next if spell.stackable?(:target => name)
 			next unless spell.available?(:target => name)
+			next unless spell.time_per(:target => name) > short_spell_time
 			next if skip_targets.include?(name) or skip_spells.include?(spell.num)
 			next if (name == Char.name) and (spell.circlename == 'Bard') and spell.active?
 			target_info[name][spell.num.to_s] ||= 0
@@ -1082,6 +1198,7 @@ else
 		target_info.keys.each { |name|
 			next if spell.stackable?(:target => name) or spell.refreshable?(:target => name)
 			next unless spell.available?(:target => name)
+			next unless spell.time_per(:target => name) > short_spell_time
 			next if (name == Char.name) and (spell.circlename == 'Bard') and spell.active?
 			target_info[name][spell.num.to_s] ||= 0
 			unless target_info[name][spell.num.to_s] > 0

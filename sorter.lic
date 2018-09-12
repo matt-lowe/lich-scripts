@@ -6,7 +6,32 @@
 	;sorter width=<window width in characters>    to display contents in columns
 	;sorter width=nil                             to stop using columns
 
-	tillmen@lichproject.org
+	 author: Tillmen (tillmen@lichproject.org)
+	   game: Gemstone
+	   tags: cosmetic
+	version: 0.9
+
+	changelog:
+		0.9 (2016-08-17):
+			fix for the last fix
+		0.8 (2016-08-07):
+			fix for containers that give XML of what's inside the container when you look on the container
+		0.7 (2015-04-16):
+			fix display of broken containers on WizardFE
+
+=end
+=begin
+
+		0.6 (2015-02-17):
+			fix the fix for squelching containers that can't be sorted
+		0.5 (2015-02-17):
+			another fix for squelching containers that can't be sorted
+		0.4 (2014-11-21):
+			fix for squelching containers that can't be sorted
+		0.3 (2014-11-21):
+			testing fix for squelching containers that can't be sorted
+		0.2 (2014-11-10):
+			don't display container contents twice on Lich 4.6
 
 =end
 
@@ -73,19 +98,28 @@ best_column_count = proc { |list|
 }
 
 begin
-	action = proc { |server_string|
-		if server_string =~ /^(<container.*inv>|<exposeContainer.*inv>)(?:[IO]n the .*?exist=".*?".*? you see |Peering into the .*?, you see .*?(?:, | and )(?:a|an|some) <).*\./
-			$1
+	action = proc { |s|
+		if s =~ /^(<(?:c|clearC|exposeC)ontainer.+>)?(?:[IO]n the .*? you see |Peering into the .*?, you see .*?(?:, | and )(?:a|an|some) <)/
+			xml_only = $1
+			if s =~ /In the/ and s =~ /On the/
+				s
+			elsif s =~ /^(?:<container.*inv>|<clearContainer.*inv>|<exposeContainer.*inv>)(?:(?:[IO]n the .*?) you see .*\.|(?:Peering into the .*?, you see .*?)(?:, | and )(?:a|an|some) <.*\.)/
+				xml_only
+			else
+				s
+			end
 		else
-			server_string
+			s
 		end
 	}
 	DownstreamHook.add('sorter', action)
 	while (line = get)
-		if line =~ /^(?:<container.*inv>|<exposeContainer.*inv>)([IO]n the .*?) you see .*\./
+		if line =~ /^(?:<container.*inv>|<clearContainer.*inv>|<exposeContainer.*inv>)([IO]n the .*?) you see .*\./
 			container = $1
-		elsif line =~ /^(?:<container.*inv>|<exposeContainer.*inv>)(Peering into the .*?, you see .*?)(?:, | and )(?:a|an|some) <.*\./
+			next if line =~ /In the/ and line =~ /On the/
+		elsif line =~ /^(?:<container.*inv>|<clearContainer.*inv>|<exposeContainer.*inv>)(Peering into the .*?, you see .*?)(?:, | and )(?:a|an|some) <.*\./
 			container = $1.concat ' and'
+			next if line =~ /In the/ and line =~ /On the/
 		else
 			next
 		end

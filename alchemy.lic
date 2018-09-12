@@ -1,13 +1,50 @@
 =begin
 
-	slightly faster alchemy script of doom!!!1!one
+	Alchemy Script of Doom!!!1!one
 
 	;alchemy help
 
-	tillmen@lichproject.org
+	  author: Tillmen (tillmen@lichproject.org)
+	    game: Gemstone
+	    tags: alchemy, guild
+	 version: 0.14
+	required: alchemy-recipes.lic >= 0.3
+
+	changelog:
+		0.14 (2017-11-11):
+			fix squelching of gld verb for inactive members
+		0.13 (2017-01-14):
+			make grind task work with "set sortedview on"
+		0.12 (2015-07-08):
+			added support for more scripted containers
 
 =end
+=begin
 
+		0.11 (2015-07-08):
+			fix a bug where the wrong version of a recipe might be used when a specific step is required
+		0.10 (2015-04-27):
+			add options to clear helper scripts
+		0.9 (2014-12-12):
+			fix sunlight detection
+		0.8 (2014-12-11):
+			bugfix for Ruby 1.8
+		0.7 (2014-12-10):
+			move equivalents and reagent values (not complete) into alchemy-recipes.lic
+			add time and value of each item to recipe check summary
+			allow containts to be set using the script instead of ;settings/;vars
+		0.6 (2014-11-12):
+			recognize gld messaging for inactive members
+		0.5 (2014-10-09):
+			added message for scripted container (You carefully attach)
+		0.4 (2014-10-07):
+			more Mist Harbor fixes
+		0.3 (2014-10-07):
+			use Mist Harbor promissory note on Mist Harbor
+		0.2 (2014-10-07):
+			fix issue with finding recipes for alchemy masters task
+
+=end
 
 # fixme: run outta money
 # fixme: full containers
@@ -16,10 +53,11 @@
 # fixme: Khelorof says, "To rise to the top, you must diversify.  You need to learn 2 rank(s) of other skills before I can promote you in this skill again."
 # fixme: recast haste on armor hindrance
 # fixme: option to use symbol of dreams when waiting for spirit
-# fixme: pick the best npc to kill in travel range instead of the closest
-# fixme: wrong note when running to a different town to buy
+# fixme: use time verb for sunlight test
+# fixme: The surface of the solution in the iron cauldron shimmers in response!
+# fixme: The diamond lens shatters!
 
-silence_me
+silence_me unless $alchemy_debug
 
 unless defined?($alchemy_recipes) and ($alchemy_recipes.class == Array) and not $alchemy_recipes.empty?
 	unless Script.exists?('alchemy-recipes')
@@ -36,7 +74,16 @@ unless defined?($alchemy_recipes) and ($alchemy_recipes.class == Array) and not 
 		echo 'no recipes'
 		exit
 	end
-	$alchemy_recipes.delete_if { |recipe| !recipe[:for].nil? and !recipe[:for].include?(Char.prof) }
+	unless defined?($alchemy_reagent_op_cost)
+		start_script 'repository', [ 'download', 'alchemy-recipes' ]
+		wait_while { running?('repository') }
+		start_script 'alchemy-recipes'
+		wait_while { running?('alchemy-recipes') }
+		unless defined?($alchemy_reagent_op_cost)
+			echo 'error: failed to download a new enough version of alchemy-recipes'
+			exit
+		end
+	end
 end
 
 CharSettings['hide-gld-check']     = true  if CharSettings['hide-gld-check'].nil?
@@ -51,6 +98,12 @@ CharSettings['max-hunt-time']    ||=  300
 CharSettings['max-forage-time']  ||=  300
 CharSettings['cost-per-second']  ||=   15
 CharSettings['favorite-recipes'] ||= Array.new
+
+echo CharSettings['kill time'].inspect if $alchemy_debug
+
+put_regex     = /^You (?:attempt to shield .*? from view as you |discreetly |carefully |absent-mindedly )?(?:put|place|slip|tuck|add|hang|drop|untie your|find an incomplete bundle|wipe off .*? and sheathe)|^A sigh of grateful pleasure can be heard as you feed .*? to your|^As you place|^I could not find what you were referring to\.$|^Your bundle would be too large|^The .+ is too large to be bundled\.|^As you place your|^The .*? is already a bundle|^Your .*? won't fit in .*?\.$|^You can't .+ It's closed!$/
+get_regex     = /^You (?:shield the opening of .*? from view as you |discreetly |carefully |deftly )?(?:remove|draw|grab|reach|slip|tuck|retrieve|already have|unsheathe|detach)|^Get what\?$|^Why don't you leave some for others\?$|^You need a free hand|^You already have that/
+cauldron_noun = /^(?:cauldron|vat|kettle|boiler)$/
 
 elusive_reagent_cost = {
 	'cluster of ayanad crystals'        =>   64,
@@ -88,35 +141,40 @@ elusive_reagent_cost = {
 	'radiant crimson mote of essence'   => 6885,
 }
 
-equivalent = [
-	[ 'ayana leaf', 'ayana lichen', 'ayana weed', 'ayana berry', 'ayana root' ],
-	[ "ayana'al leaf", "ayana'al lichen", "ayana'al weed", "ayana'al berry", "ayana'al root" ],
-	[ 'some ground ayana', 'some ground ayana leaf', 'some ground ayana lichen', 'some ground ayana weed', 'some ground ayana berry', 'some ground ayana root' ],
-	[ 'myklian scale', 'orange myklian scale', 'red myklian scale', 'yellow myklian scale', 'green myklian scale' ],
-	[ 'white pearl', 'large white pearl', 'medium white pearl', 'small white pearl', 'tiny white pearl' ],
-	[ 'black pearl', 'large black pearl', 'medium black pearl', 'small black pearl', 'tiny black pearl' ],
-	[ 'pink pearl', 'tiny pink pearl', 'small pink pearl', 'medium pink pearl', 'large pink pearl' ],
-	[ 'stick', 'thick stick', 'stained stick', 'slender stick', 'pointed stick', 'twisted stick', 'long stick', 'slim stick', 'charred stick', 'flexible stick', 'sturdy stick', 'dark stick', 'hefty stick', 'cracked stick', 'thin stick', 'small stick', 'bent stick', 'short stick', 'heavy stick' ],
-	[ 'vial of concentrated firethorn essence', 'vial concentrated firethorn essence' ],
-	[ 'some powdered rhodochrosite stone', 'some powdered pink rhodochrosite stone' ],
-	[ 'some powdered chrysoberyl gem', 'some powdered bright chrysoberyl gem' ],
-	[ 'some powdered malachite stone', 'some powdered green malachite stone' ],
-	[ 'some powdered spessartine garnet', 'some powdered orange spessartine garnet' ],
-	[ 'some powdered pink coral', 'some powdered polished pink coral' ],
-	[ 'some powdered blue coral', 'some powdered polished blue coral' ],
-	[ 'some powdered red coral', 'some powdered polished red coral' ],
-	[ 'some powdered water sapphire', 'some powdered pale water sapphire' ],
-	[ 'some powdered fire pearl', 'some powdered billiant fire pearl' ],
-	[ 'some powdered cowrie shell', 'some powdered snake-head cowrie shell' ],
-	[ 'some powdered iridescent mother-of-pearl', 'some powdered iridescent piece of mother-of-pearl' ],
-	[ 'some powdered silvery conch shell', 'some powdered sparkling silvery conch shell' ],
-	[ 'some powdered imperial topaz', 'some powdered orange imperial topaz' ],
-	[ 'some powdered green moonstone', 'some powdered pale green moonstone' ],
-	[ 'some powdered pale blue moonstone', 'some powdered blue moonstone' ],
-	[ 'some powdered beryl gem', 'some powdered golden beryl gem' ],
-	[ 'crystalline globe', 'corked crystalline globe filled with glowing mineral water', ],
-	[ 'tkaro root', 'shiny tkaro root' ],
-]
+if $alchemy_equivalents
+	equivalent = $alchemy_equivalents
+else
+	equivalent = [
+		[ 'ayana leaf', 'ayana lichen', 'ayana weed', 'ayana berry', 'ayana root' ],
+		[ "ayana'al leaf", "ayana'al lichen", "ayana'al weed", "ayana'al berry", "ayana'al root" ],
+		[ 'some ground ayana', 'some ground ayana leaf', 'some ground ayana lichen', 'some ground ayana weed', 'some ground ayana berry', 'some ground ayana root' ],
+		[ 'myklian scale', 'orange myklian scale', 'red myklian scale', 'yellow myklian scale', 'green myklian scale' ],
+		[ 'white pearl', 'large white pearl', 'medium white pearl', 'small white pearl', 'tiny white pearl' ],
+		[ 'black pearl', 'large black pearl', 'medium black pearl', 'small black pearl', 'tiny black pearl' ],
+		[ 'pink pearl', 'tiny pink pearl', 'small pink pearl', 'medium pink pearl', 'large pink pearl' ],
+		[ 'stick', 'thick stick', 'stained stick', 'slender stick', 'pointed stick', 'twisted stick', 'long stick', 'slim stick', 'charred stick', 'flexible stick', 'sturdy stick', 'dark stick', 'hefty stick', 'cracked stick', 'thin stick', 'small stick', 'bent stick', 'short stick', 'heavy stick' ],
+		[ 'vial of concentrated firethorn essence', 'vial concentrated firethorn essence' ],
+		[ 'some powdered rhodochrosite stone', 'some powdered pink rhodochrosite stone' ],
+		[ 'some powdered chrysoberyl gem', 'some powdered bright chrysoberyl gem' ],
+		[ 'some powdered malachite stone', 'some powdered green malachite stone' ],
+		[ 'some powdered spessartine garnet', 'some powdered orange spessartine garnet' ],
+		[ 'some powdered pink coral', 'some powdered polished pink coral' ],
+		[ 'some powdered blue coral', 'some powdered polished blue coral' ],
+		[ 'some powdered red coral', 'some powdered polished red coral' ],
+		[ 'some powdered water sapphire', 'some powdered pale water sapphire' ],
+		[ 'some powdered fire pearl', 'some powdered billiant fire pearl' ],
+		[ 'some powdered cowrie shell', 'some powdered snake-head cowrie shell' ],
+		[ 'some powdered iridescent mother-of-pearl', 'some powdered iridescent piece of mother-of-pearl' ],
+		[ 'some powdered silvery conch shell', 'some powdered sparkling silvery conch shell' ],
+		[ 'some powdered imperial topaz', 'some powdered orange imperial topaz' ],
+		[ 'some powdered green moonstone', 'some powdered pale green moonstone' ],
+		[ 'some powdered pale blue moonstone', 'some powdered blue moonstone' ],
+		[ 'some powdered beryl gem', 'some powdered golden beryl gem' ],
+		[ 'crystalline globe', 'corked crystalline globe filled with glowing mineral water', ],
+		[ 'tkaro root', 'shiny tkaro root' ],
+		[ 'tufted hawk-owl ear', 'hawk-owl ear' ],
+	]
+end
 
 herb_doses = {
 	'some acantha leaf' => 10,
@@ -134,7 +192,7 @@ herb_doses = {
 	'some torban leaf' => 3,
 }
 
-sea_water_flask = /^(?:small|faceted) crystal flask$|^dark sphene-inset flask$/
+sea_water_flask = /^(?:small|small opaque|faceted) crystal flask$|^dark sphene-inset flask$/
 sea_water_vial  = /^(?:clouded|warped|chipped|tapered|smoky|thick|slender|clear|blackened) glass vial$|^polished glaes vial$/
 bundled_herb    = /^some acantha leaf$|^some cactacae spine$|^some ambrominas leaf$|^some torban leaf$|^some wolifrew lichen$|^some sovyn clove$|^some ephlox moss$|^some pothinir grass$|^some haphip root$|^some calamia fruit$|^some aloeas stem$|^some basal moss$|^some woth flower$/
 
@@ -198,7 +256,7 @@ gld = proc {
 						nil
 					end
 				else
-					if server_string =~ /^You are (?:a member|Guild Master)/
+					if server_string =~ /^You are (?:a member|an inactive member|Guild Master)/
 						started = true
 						nil
 					else
@@ -210,10 +268,23 @@ gld = proc {
 		end
 		undo_silent = !script.silent
 		script.silent = true
-		dothistimeout 'gld', 10, /^You are (?:a member|Guild Master)/
+		result = dothistimeout 'gld', 15, /^You are (?:a member|an inactive member|Guild Master)|^You have no guild affiliation./
 		script.silent = false if undo_silent
+		if result =~ /^You have no guild affiliation./
+			echo 'join a guild'
+			exit
+		elsif result.nil?
+			echo 'fixme 20983238453'
+		end
 		while (line = get) and (line !~ /<prompt/)
-			if line =~ /^You have ([0-9]+|no) ranks? in the (General Alchemy|Alchemic Potions|Alchemic Trinkets) skill\.$/
+			if line =~ /^You currently have no ranks in any guild skills./
+				for type in fix_type.values
+					gld_var[type] = Hash.new
+					gld_var[type][:rank] = 0
+					gld_var[type][:task] = 'no task'
+					gld_var[type][:reps] = 0
+				end
+			elsif line =~ /^You have ([0-9]+|no) ranks? in the (General Alchemy|Alchemic Potions|Alchemic Trinkets) skill\.$/
 				rank = $1
 				type = fix_type[$2]
 				gld_var[type] = Hash.new
@@ -256,19 +327,29 @@ gld_suggestions = proc {
 			if gld_var[type][:task] =~ /(?:with your|that involve) (.*?)(?: ability| mana|ing spells|ing|ing mana|ing spirit)?$/
 				required_step = $1
 				if gld_var[type][:task] =~ /cauldron workshop/
-					gld_var[type][:recipes] = $alchemy_recipes.find_all { |recipe| recipe[:type].include?(type) and recipe[:rank] and gld_var[type][:rank] >= recipe[:rank].min and gld_var[type][:rank] <= recipe[:rank].max and recipe[:steps].any? { |step| step =~ /^#{required_step}/ } and not recipe[:steps].any? { |step| step =~ /^refract/ } }.collect { |recipe| recipe[:product] }
+					gld_var[type][:recipes] = $alchemy_recipes.find_all { |recipe| recipe[:type].include?(type) and recipe[:rank] and gld_var[type][:rank] >= recipe[:rank].min and gld_var[type][:rank] <= recipe[:rank].max and recipe[:steps].any? { |step| step =~ /^#{required_step}/ } and not recipe[:steps].any? { |step| step =~ /^refract/ } }
 				else
-					gld_var[type][:recipes] = $alchemy_recipes.find_all { |recipe| recipe[:type].include?(type) and recipe[:rank] and gld_var[type][:rank] >= recipe[:rank].min and gld_var[type][:rank] <= recipe[:rank].max and recipe[:steps].any? { |step| step =~ /^#{required_step}/ } }.collect { |recipe| recipe[:product] }
+					gld_var[type][:recipes] = $alchemy_recipes.find_all { |recipe| recipe[:type].include?(type) and recipe[:rank] and gld_var[type][:rank] >= recipe[:rank].min and gld_var[type][:rank] <= recipe[:rank].max and recipe[:steps].any? { |step| step =~ /^#{required_step}/ } }
 				end
 			elsif gld_var[type][:task] =~ /follow some tough recipes and create some items|visit a skilled master for a lesson/
-				gld_var[type][:recipes] = $alchemy_recipes.find_all { |recipe| (recipe[:product] != 'flask of pure water') and recipe[:type].include?(type) and recipe[:rank] and gld_var[type][:rank] >= recipe[:rank].min and gld_var[type][:rank] <= recipe[:rank].max }.collect { |recipe| recipe[:product] }
+				gld_var[type][:recipes] = $alchemy_recipes.find_all { |recipe| (recipe[:product] != 'flask of pure water') and recipe[:type].include?(type) and recipe[:rank] and gld_var[type][:rank] >= recipe[:rank].min and gld_var[type][:rank] <= recipe[:rank].max }
 			elsif gld_var[type][:task] == 'practice distilling for reagents'
-				gld_var[type][:recipes] = $alchemy_recipes.find_all { |recipe| recipe[:product] == 'flask of pure water' }.collect { |recipe| recipe[:product] }
+				gld_var[type][:recipes] = $alchemy_recipes.find_all { |recipe| recipe[:product] == 'flask of pure water' }
 			elsif gld_var[type][:task] == 'practice extracting for reagents'
-				gld_var[type][:recipes] = $alchemy_recipes.find_all { |recipe| recipe[:product] == 'handful of sea salt' }.collect { |recipe| recipe[:product] }
+				gld_var[type][:recipes] = $alchemy_recipes.find_all { |recipe| recipe[:product] == 'handful of sea salt' }
 			else
 				gld_var[type][:recipes] = Array.new
 			end
+		end
+	end
+	gld_var
+}
+
+gld_suggestions2 = proc {
+	gld.call
+	if gld_var.values.any? { |hash| hash[:recipes].nil? }
+		for type in gld_var.keys
+			gld_var[type][:recipes] = $alchemy_recipes.find_all { |recipe| (recipe[:product] != 'flask of pure water') and recipe[:type].include?(type) and recipe[:rank] and gld_var[type][:rank] >= recipe[:rank].min and gld_var[type][:rank] <= recipe[:rank].max }.collect { |recipe| recipe[:product] }
 			gld_var[type][:recipes] = gld_var[type][:recipes] | gld_var[type][:recipes]
 		end
 	end
@@ -280,7 +361,7 @@ close_alchemy_sack_var = false
 alchemy_sack = proc {
 	if alchemy_sack_var.nil?
 		if UserVars.alchemysack.nil? or UserVars.alchemysack.empty? 
-			echo 'warning: alchemysack is not set (;set change alchemysack <container name>)'
+			echo 'warning: alchemysack is not set (#{$clean_lich_char}#{script.name} set alchemysack <container name>)'
 			sleep 1
 		else
 			alchemy_sack_var = GameObj.inv.find { |obj| obj.name =~ /#{Regexp.escape(UserVars.alchemysack.strip)}/i } || GameObj.inv.find { |obj| obj.name =~ /#{Regexp.escape(UserVars.alchemysack).sub(' ', ' .*')}/i }
@@ -310,7 +391,7 @@ close_loot_sack_var = false
 loot_sack = proc {
 	if loot_sack_var.nil?
 		if UserVars.lootsack.nil? or UserVars.lootsack.empty? 
-			echo 'warning: lootsack is not set (;set change lootsack <container name>)'
+			echo 'warning: lootsack is not set (#{$clean_lich_char}#{script.name} set lootsack <container name>)'
 			sleep 1
 		else
 			loot_sack_var = GameObj.inv.find { |obj| obj.name =~ /#{Regexp.escape(UserVars.lootsack.strip)}/i } || GameObj.inv.find { |obj| obj.name =~ /#{Regexp.escape(UserVars.lootsack).sub(' ', ' .*')}/i }
@@ -340,7 +421,7 @@ close_herb_sack_var = false
 herb_sack = proc {
 	if herb_sack_var.nil?
 		if UserVars.herbsack.nil? or UserVars.herbsack.empty? 
-			echo 'warning: herbsack is not set (;set change herbsack <container name>)'
+			echo 'warning: herbsack is not set (#{$clean_lich_char}#{script.name} set herbsack <container name>)'
 			sleep 1
 		else
 			herb_sack_var = GameObj.inv.find { |obj| obj.name =~ /#{Regexp.escape(UserVars.herbsack.strip)}/i } || GameObj.inv.find { |obj| obj.name =~ /#{Regexp.escape(UserVars.herbsack).sub(' ', ' .*')}/i }
@@ -387,12 +468,12 @@ all_sack_contents = proc {
 cauldron = nil
 drop_cauldron = proc {
 	error = false
-	unless (checkroom == '[A Secluded Corner]') or GameObj.room_desc.find { |obj| obj.noun == 'cauldron' } or GameObj.loot.find { |obj| obj.noun =~ /^(?:cauldron|vat|kettle)$/ }
-		unless cauldron = all_sack_contents.call.find { |obj| obj.noun =~ /^(?:cauldron|vat|kettle)$/ }
+	unless (checkroom == '[A Secluded Corner]') or GameObj.room_desc.find { |obj| obj.noun == 'cauldron' } or GameObj.loot.find { |obj| obj.noun =~ cauldron_noun }
+		unless cauldron = all_sack_contents.call.find { |obj| obj.noun =~ cauldron_noun }
 			echo 'error: missing cauldron'
 			error = true
 		end
-		dothis "get ##{cauldron.id}", /^You remove|^You already have that|^You detach/
+		dothis "get ##{cauldron.id}", get_regex
 		# Upon further reflection, you decide it would be best if you just used the already present training cauldron.
 		dothis "drop ##{cauldron.id}", /^You drop/
 		put "drag #{cauldron.noun}"
@@ -402,11 +483,11 @@ drop_cauldron = proc {
 
 force_drop_cauldron = proc {
 	error = false
-	unless cauldron = all_sack_contents.call.find { |obj| obj.noun =~ /^(?:cauldron|vat|kettle)$/ }
+	unless cauldron = all_sack_contents.call.find { |obj| obj.noun =~ cauldron_noun }
 		echo 'error: missing cauldron'
 		error = true
 	else
-		dothis "get ##{cauldron.id}", /^You remove|^You already have that|^You detach/
+		dothis "get ##{cauldron.id}", get_regex
 		# Upon further reflection, you decide it would be best if you just used the already present training cauldron.
 		dothis "drop ##{cauldron.id}", /^You drop/
 		put "drag #{cauldron.noun}"
@@ -416,7 +497,7 @@ force_drop_cauldron = proc {
 
 get_cauldron = proc {
 	if cauldron
-		dothis "_drag ##{cauldron.id} ##{alchemy_sack.call.id}", /^You put|^I could not find what you were referring to\./
+		dothis "_drag ##{cauldron.id} ##{alchemy_sack.call.id}", put_regex
 		fput 'drag stop'
 		cauldron = nil
 	end
@@ -424,19 +505,22 @@ get_cauldron = proc {
 
 where_is_previous_var = nil
 where_is_shortest_distances_var = nil
+where_is_history = Hash.new
 where_is = proc { |place|
-	if where_is_previous_var.nil?
+	if where_is_history[place]
+		where_is_history[place]
+	elsif where_is_previous_var.nil?
 		if Room.current
 			if home_room = Room.current.find_nearest_by_tag("#{Char.prof.downcase} alchemy administrator")
 				home_room = Room[home_room]
-				if (home_room == Room.current) or Map.estimate_time(Room.current.path_to(home_room)) <= CharSettings['max-travel-time']
-					where_is_previous_var, where_is_shortest_distances_var = home_room.dijkstra
-				else
-					echo 'warning: nearest guild exceeds max travel time'
-					where_is_previous_var = false
-				end
 			else
 				echo 'warning: failed to find your guild'
+				home_room = Room.current
+			end
+			if (home_room == Room.current) or Map.estimate_time(Room.current.path_to(home_room)) <= CharSettings['max-travel-time']
+				where_is_previous_var, where_is_shortest_distances_var = home_room.dijkstra
+			else
+				echo 'warning: nearest guild exceeds max travel time'
 				where_is_previous_var = false
 			end
 		else
@@ -449,10 +533,15 @@ where_is = proc { |place|
 	else
 		results = Array.new
 		Map.list.each { |room| results.push(room.id) if room.tags.include?(place) }
+		if place == 'ayana leaf'
+			["ayana berry", "ayana leaf", "ayana root", "ayana weed", "ayana lichen"].each { |other_place| Map.list.each { |room| results.push(room.id) if room.tags.include?(other_place) and not results.include?(room.id) } }
+			#"ayana'al berry", "ayana'al root", "ayana'al lichen"
+		end
 		results.delete_if { |room_id| where_is_shortest_distances_var[room_id].nil? or where_is_shortest_distances_var[room_id] > CharSettings['max-travel-time'] }
 		# ignore the Caravansary
 		results.delete_if { |room_id| Room[room_id].title.any? { |t| t =~ /^(?:\['Tain't Much Magic, Emporium\]|\['Tain't Much Magic, Consignment\]|\[Finders-Sellers Pawnshop\]|\[Clenchfist Bros. Banking, Lobby\])$/ } }
-		results.sort { |a,b| where_is_shortest_distances_var[a] <=> where_is_shortest_distances_var[b] }
+		where_is_history[place] = results.sort { |a,b| where_is_shortest_distances_var[a] <=> where_is_shortest_distances_var[b] }
+		where_is_history[place]
 	end
 }
 
@@ -508,6 +597,29 @@ note_name = proc {
 	end
 }
 
+note_name_from_place = proc { |place|
+	if place =~ /Icemule/
+		'Icemule promissory note'
+	elsif place =~ /Ta'Illistim|Ta'Vaalor/
+		'City-States promissory note'
+	elsif place =~ /River's Rest/
+		'Torren promissory note'
+	elsif place =~ /Solhaven/
+		'Vornavis promissory note'
+	elsif place =~ /Kharam-Dzu/
+		'Borthuum Mining Company scrip'
+	elsif place =~ /Wehnimer's Landing/
+		"Wehnimer's promissory note"
+	elsif place =~ /Zul Logoth/
+		'mining chit'
+	elsif place =~ /Mist Harbor/
+		'Mist Harbor promissory note'
+	else
+		nil
+	end
+}
+
+is_sunlight_cache = nil
 is_sunlight = proc {
 	# fixme: guessing times for light
 	# mid-morning:     11:26 - 11:26
@@ -526,20 +638,40 @@ is_sunlight = proc {
 		# mid morning:      08:34 - 11:59 (sunlight)
 		# afternoon:        12:00 -     ? (sunlight)
 
+	# June 3, 2014
+		# late afternoon:   15:37 - 19:13 (sunlight)
+		# evening twilight: 19:14 - 19:43 (moonlight)
+		# late evening:     19:44 - 23:59 (moonlight)
+		# after midnight:    0:00 -  4:14 (moonlight)
+		# morning twilight:  4:15 -  4:44 
+		# early morning:     4:45 -  8:23 (sunlight)
+		# mid morning:       8:24 - 11:59 (sunlight)
+		# afternoon:        12:00 - 15:36 (sunlight)
+
 	# fixme: daylight savings time?
 
-	time = Time.at(Time.now.to_i + XMLData.server_time_offset)
-	time = time - (21600 + time.utc_offset)
-	(time.hour > 5 or (time.hour == 5 and time.min > 7)) and (time.hour < 18 or (time.hour == 18 and time.min < 51))
+	seconds = (XMLData.server_time - (5*60*60)) % (60*60*24) # seconds since midnight, elven time standard
+	hours = seconds/(60*60)
+	seconds = seconds % (60*60)
+	minutes = seconds/60
+	seconds = seconds % 60
 
-	# (server_time.hour > 4 or (server_time.hour == 4 and server_time.min > 30)) and (server_time.hour < 16 or (server_time.hour == 16 and server_time.min < 30))
-	# offset = -18000
-	# if Time.now.dst?
-	# 	offset += 3600
-	# end
-	# fixme: getlocal doesn't take an offset on Ruby 1.8
-	# time = Time.at(Time.now.to_f + XMLData.server_time_offset.to_f).getlocal(offset)
-	# (time.hour > 5 or (time.hour == 5 and time.min > 7)) and (time.hour < 18 or (time.hour == 18 and time.min < 51))
+	if ((hours > 6) or ((hours == 6) and (minutes > 30))) and (hours < 18)
+		true
+	elsif (hours < 5) or (hours > 20)
+		false
+	elsif is_sunlight_cache and is_sunlight_cache[0] == "#{Time.now.hour}:#{Time.now.min}"
+		is_sunlight_cache[1]
+	else
+		result = dothis 'time', /^Today is /
+		if result =~ /early morning|mid morning|afternoon|late afternoon/
+			is_sunlight_cache = [ "#{Time.now.hour}:#{Time.now.min}", true ]
+			true
+		else
+			is_sunlight_cache = [ "#{Time.now.hour}:#{Time.now.min}", false ]
+			false
+		end
+	end
 }
 
 is_moonlight = proc { !is_sunlight.call }
@@ -681,6 +813,26 @@ read_menu = proc {
 	menu
 }
 
+add_commas = proc { |num|
+	num.to_s.reverse.scan(/(?:\d*\.)?\d{1,3}-?/).join(',').reverse
+}
+
+trading_sell = proc { |silvers|
+	if Skills.trading > 6
+		(silvers*((((Skills.to_bonus(Skills.trading) + Stats.inf[1])/12)/100.0)+1)).floor
+	else
+		silvers
+	end
+}
+
+trading_buy = proc { |silvers|
+	if Skills.trading > 6
+		silvers - (silvers * (((Skills.to_bonus(Skills.trading) + Stats.inf[1])/12)/100.0)).floor
+	else
+		silvers
+	end
+}
+
 check_channel_spirit = proc {
 	needed_spirit = 3
 	needed_spirit += 1 if Spell[9912].active?
@@ -706,7 +858,7 @@ check_ingredient = proc { |ingredient_name,temp_claimed_ingredients,temp_ingredi
 	elsif bundle = all_sack_contents.call.find { |obj| equivalent_ingredients.include?(obj.name) and (obj.name =~ bundled_herb) and (temp_ingredient_count[obj.id].nil? or temp_ingredient_count[obj.id] > 0) }
 		if temp_ingredient_count[bundle.id].nil?
 			empty_hand
-			dothistimeout "get ##{bundle.id}", 10, /^You remove|^You already have that/
+			dothistimeout "get ##{bundle.id}", 10, get_regex
 			measure_result = dothistimeout "measure ##{bundle.id}", 10, /^(?:You can't tell exactly, but the|The) .*? (?:has 1 bite|has 2 bites|looks like it has a few bites|looks like it has several bites|seems to have plenty of bites) left\./
 			if measure_result =~ /1 bite/
 				temp_ingredient_count[bundle.id] = 1
@@ -728,7 +880,7 @@ check_ingredient = proc { |ingredient_name,temp_claimed_ingredients,temp_ingredi
 				ingredient_count[bundle.id] = 1
 				echo "error: unmatched measure result: #{measure_result.inspect}"
 			end
-			dothistimeout "put ##{bundle.id} in ##{herb_sack.call.id}", 10, /^You put|^I could not find what you were referring to\./
+			dothistimeout "put ##{bundle.id} in ##{herb_sack.call.id}", 10, put_regex
 			fill_hand
 		end
 		temp_ingredient_count[bundle.id] = temp_ingredient_count[bundle.id] - 1
@@ -779,9 +931,9 @@ get_ingredient = proc { |ingredient_name|
 	ingredient = nil
 	equivalent_ingredients = (equivalent.find { |list| list.include?(ingredient_name) } || [ ingredient_name ])
 	if ingredient = all_sack_contents.call.find { |obj| equivalent_ingredients.include?(obj.name) and (obj.name !~ bundled_herb) }
-		dothistimeout "get ##{ingredient.id}", 10, /^You remove|^You already have that/
+		dothistimeout "get ##{ingredient.id}", 10, get_regex
 	elsif bundle = all_sack_contents.call.find { |obj| equivalent_ingredients.include?(obj.name) and (obj.name =~ bundled_herb) }
-		dothistimeout "get ##{bundle.id}", 10, /^You remove|^You already have that/
+		dothistimeout "get ##{bundle.id}", 10, get_regex
 		bundle_remove_result = dothistimeout 'bundle remove', 10, /^You (?:carefully )?remove|^Those were the last two|^You only have one/
 		if bundle_remove_result =~ /^You only have one/
 			correct_herb_count.delete(bundle.id)
@@ -789,7 +941,7 @@ get_ingredient = proc { |ingredient_name|
 			ingredient = bundle
 		elsif correct_herb_count.include?(bundle.id)
 			ingredient_count[bundle.id] = ingredient_count[bundle.id] - 1
-			dothistimeout "put ##{bundle.id} in ##{herb_sack.call.id}", 10, /^You put|^I could not find what you were referring to\./
+			dothistimeout "put ##{bundle.id} in ##{herb_sack.call.id}", 10, put_regex
 			if checkleft
 				ingredient = GameObj.left_hand
 			else
@@ -824,7 +976,7 @@ get_ingredient = proc { |ingredient_name|
 			else
 				ingredient_count[bundle.id] = [(ingredient_count[bundle.id] - 1), min_count].max
 			end
-			dothistimeout "put ##{bundle.id} in ##{herb_sack.call.id}", 10, /^You put|^I could not find what you were referring to\./
+			dothistimeout "put ##{bundle.id} in ##{herb_sack.call.id}", 10, put_regex
 			if checkleft
 				ingredient = GameObj.left_hand
 			else
@@ -836,9 +988,9 @@ get_ingredient = proc { |ingredient_name|
 			ingredient_count[jar.id] = ingredient_count[jar.id] - 1
 			ingredient_count.delete(jar.id) if ingredient_count[jar.id] < 1
 		end
-		dothistimeout "get ##{jar.id}", 10, /^You remove|^You already have that/
+		dothistimeout "get ##{jar.id}", 10, get_regex
 		dothistimeout "shake ##{jar.id}", 10, /^You .*shake/
-		dothistimeout "put ##{jar.id} in ##{alchemy_sack.call.id}", 10, /^You put|^I could not find what you were referring to\./
+		dothistimeout "put ##{jar.id} in ##{alchemy_sack.call.id}", 10, put_regex
 		if checkleft
 			ingredient = GameObj.left_hand
 		else
@@ -849,9 +1001,9 @@ get_ingredient = proc { |ingredient_name|
 			ingredient_count[bundle.id] = ingredient_count[bundle.id] - 1
 			ingredient_count.delete(bundle.id) if ingredient_count[bundle.id] < 2
 		end
-		dothistimeout "get ##{bundle.id}", 10, /^You remove|^You already have that/
+		dothistimeout "get ##{bundle.id}", 10, get_regex
 		unbundle_result = dothistimeout 'bundle remove', 10, /^You remove|^Those were the last two/
-		dothistimeout "put ##{bundle.id} in ##{alchemy_sack.call.id}", 10, /^You put|^I could not find what you were referring to\./
+		dothistimeout "put ##{bundle.id} in ##{alchemy_sack.call.id}", 10, put_regex
 		if checkleft
 			ingredient = GameObj.left_hand
 		else
@@ -864,27 +1016,34 @@ get_ingredient = proc { |ingredient_name|
 put_crap_away = proc {
 	if (GameObj.right_hand.name =~ /ayanad crystals$/) or (GameObj.left_hand.name =~ /ayanad crystals$/)
 		dothis "get crystal from my crystals", /You separate/
-		dothis "put ##{GameObj.right_hand.id} in ##{alchemy_sack.call.id}", /^You put|^I could not find what you were referring to\./
-		dothis "put ##{GameObj.left_hand.id} in ##{alchemy_sack.call.id}", /^You put|^I could not find what you were referring to\./
+		dothis "put ##{GameObj.right_hand.id} in ##{alchemy_sack.call.id}", put_regex
+		dothis "put ##{GameObj.left_hand.id} in ##{alchemy_sack.call.id}", put_regex
 	end
 	if checkright
 		if is_reagent.call(GameObj.right_hand.name)
-			dothis "put ##{GameObj.right_hand.id} in ##{alchemy_sack.call.id}", /^You put|^I could not find what you were referring to\./
+			dothis "put ##{GameObj.right_hand.id} in ##{alchemy_sack.call.id}", put_regex
 		else
-			dothis "put ##{GameObj.right_hand.id} in ##{loot_sack.call.id}", /^You put|^I could not find what you were referring to\./
+			dothis "put ##{GameObj.right_hand.id} in ##{loot_sack.call.id}", put_regex
 		end
 	end
 	if checkleft
 		if is_reagent.call(GameObj.left_hand.name)
-			dothis "put ##{GameObj.left_hand.id} in ##{alchemy_sack.call.id}", /^You put|^I could not find what you were referring to\./
+			dothis "put ##{GameObj.left_hand.id} in ##{alchemy_sack.call.id}", put_regex
 		else
-			dothis "put ##{GameObj.left_hand.id} in ##{loot_sack.call.id}", /^You put|^I could not find what you were referring to\./
+			dothis "put ##{GameObj.left_hand.id} in ##{loot_sack.call.id}", put_regex
 		end
 	end
 }
 
+recursive_padding = 0
 recursive_check_recipe = proc { |recipe,tracker,top_level|
+	recipe_start = Time.now
+	respond "#{''.ljust(recursive_padding)}start recipe: #{recipe[:product]}" if $alchemy_debug
+	recursive_padding += 3
 	recipe[:steps].each { |step|
+		step_start = Time.now
+		respond "#{''.ljust(recursive_padding)}start step: #{step}" if $alchemy_debug
+		recursive_padding += 3
 		if step =~ /^(?:add|grind|extract|distill|separate)\s+(.*)/
 			ingredient_name = $1
 			if step =~ /^grind/
@@ -903,20 +1062,21 @@ recursive_check_recipe = proc { |recipe,tracker,top_level|
 			end
 			if tracker[:extra_ingredients].include?(ingredient_name)
 				tracker[:extra_ingredients].delete_at(tracker[:extra_ingredients].index(ingredient_name))
-				tracker[:found][ingredient_name] = tracker[:found][ingredient_name].to_i + 1
 			else
 				found_this, temp_claimed_ingredients, temp_ingredient_count = check_ingredient.call(ingredient_name, tracker[:claimed_ingredients].dup, tracker[:ingredient_count].dup)
 				if found_this
 					tracker[:claimed_ingredients] = temp_claimed_ingredients
 					tracker[:ingredient_count] = temp_ingredient_count
 					tracker[:found][ingredient_name] = tracker[:found][ingredient_name].to_i + 1
-					tracker[:cost] += elusive_reagent_cost[ingredient_name].to_i
+					if $alchemy_reagent_op_cost[ingredient_name]
+						tracker[:cost] += trading_sell.call($alchemy_reagent_op_cost[ingredient_name])
+					end
 				else
 					support_recipe_list = $alchemy_recipes.find_all { |r| r[:product] == ingredient_name }
 					if support_recipe_list.length > 0
 						tracker_list = Array.new
 						for support_recipe in support_recipe_list
-							temp_tracker = { :error => tracker[:error].dup, :recipe_count => tracker[:recipe_count].dup, :claimed_ingredients => tracker[:claimed_ingredients].dup, :ingredient_count => tracker[:ingredient_count].dup, :extra_ingredients => tracker[:extra_ingredients].dup, :found => tracker[:found].dup, :buy => tracker[:buy].dup, :forage => tracker[:forage].dup, :kill_for => tracker[:kill_for].dup, :steps => tracker[:steps].dup, :prepare_steps => tracker[:prepare_steps].dup, :finish_steps => tracker[:finish_steps].dup, :cost => tracker[:cost], :time => tracker[:time] }
+							temp_tracker = { :error => tracker[:error].dup, :recipe_count => tracker[:recipe_count].dup, :claimed_ingredients => tracker[:claimed_ingredients].dup, :ingredient_count => tracker[:ingredient_count].dup, :extra_ingredients => tracker[:extra_ingredients].dup, :found => tracker[:found].dup, :buy => tracker[:buy].dup, :forage => tracker[:forage].dup, :kill_for => tracker[:kill_for].dup, :steps => tracker[:steps].dup, :prepare_steps => tracker[:prepare_steps].dup, :finish_steps => tracker[:finish_steps].dup, :cost => tracker[:cost], :time => tracker[:time], :itime => tracker[:itime].dup, :icost => tracker[:icost].dup }
 							temp_tracker = recursive_check_recipe.call(support_recipe.dup, temp_tracker, _top_level=false)
 							tracker_list.push(temp_tracker)
 							ingredient_count.each_pair { |ingredient_id,count| tracker[:ingredient_count][ingredient_id] ||= count }
@@ -941,27 +1101,40 @@ recursive_check_recipe = proc { |recipe,tracker,top_level|
 			place = $1
 			room_list = where_is.call(place)
 			if room_list.empty?
-				tracker[:error][place] = 1
+				tracker[:error]["#{place} to buy #{recipe[:product]}"] = tracker[:error]["#{place} to buy #{recipe[:product]}"].to_i + 1
 			else
 				unless tracker[:buy].keys.any? { |key| key =~ /^#{place};/ }
-					tracker[:time] += tavel_time.call(room_list.first) * 2
+					foo = tavel_time.call(room_list.first) * 2
+					tracker[:time] += foo
+					tracker[:itime][recipe[:product]] = tracker[:itime][recipe[:product]].to_i + foo
 				end
-				tracker[:cost] += recipe[:cost].to_i
+				foo = trading_buy.call(recipe[:cost].to_i)
+				tracker[:cost] += foo
+				tracker[:icost][recipe[:product]] += foo
 				tracker[:buy]["#{place};#{recipe[:product]}"] = tracker[:buy]["#{place};#{recipe[:product]}"].to_i + 1
 			end
-		elsif step =~ /^forage/
+		elsif step =~ /^forage( in sunlight| in moonlight)?/
+			light = $1
 			room_list = where_is.call(recipe[:product])
 			if room_list.empty?
 				tracker[:error][recipe[:product]] = tracker[:error][recipe[:product]].to_i + 1
+			elsif (light == ' in sunlight') and is_moonlight.call
+				tracker[:error]["sunlight to forage for #{recipe[:product]}"] = tracker[:error]["sunlight to forage for #{recipe[:product]}"].to_i + 1
+			elsif (light == ' in moonlight') and is_sunlight.call
+				tracker[:error]["moonlight to forage for #{recipe[:product]}"] = tracker[:error]["moonlight to forage for #{recipe[:product]}"].to_i + 1
 			else
 				if tracker[:forage][recipe[:product]].nil?
-					tracker[:time] += tavel_time.call(room_list.first) * 2
+					foo = tavel_time.call(room_list.first) * 2
+					tracker[:time] += foo
+					tracker[:itime][recipe[:product]] = tracker[:itime][recipe[:product]].to_i + foo
 				end
 				CharSettings['forage time'] ||= Hash.new
 				if CharSettings['forage time'][recipe[:product]].nil?
 					CharSettings['forage time'][recipe[:product]] = [ 1, 1 ]
 				end
-				tracker[:time] += CharSettings['forage time'][recipe[:product]][0] / CharSettings['forage time'][recipe[:product]][1].to_f
+				foo = CharSettings['forage time'][recipe[:product]][0] / CharSettings['forage time'][recipe[:product]][1].to_f
+				tracker[:time] += foo
+				tracker[:itime][recipe[:product]] = tracker[:itime][recipe[:product]].to_i + foo
 				tracker[:forage][recipe[:product]] = tracker[:forage][recipe[:product]].to_i + 1
 			end
 		elsif step =~ /^kill\s+(.*)/
@@ -972,25 +1145,27 @@ recursive_check_recipe = proc { |recipe,tracker,top_level|
 				# tracker[:error][npc] = tracker[:error][npc].to_i + 1
 			else
 				if CharSettings['attack-script']
-					if tracker[:kill_for][recipe[:product]].nil?
-						tracker[:time] += tavel_time.call(room_list.first) * 2
+					tracker[:kill_for][npc] ||= Hash.new
+					if tracker[:kill_for][npc].empty?
+						foo = tavel_time.call(room_list.first) * 2
+						tracker[:time] += foo
+						tracker[:itime][recipe[:product]] = tracker[:itime][recipe[:product]].to_i + foo
 					end
 					CharSettings['kill time'] ||= Hash.new
 					CharSettings['kill time'][npc] ||= Hash.new
 					if CharSettings['kill time'][npc][recipe[:product]].nil?
 						CharSettings['kill time'][npc][recipe[:product]] = [ 1, 1 ]
 					end
-					tracker[:time] += CharSettings['kill time'][npc][recipe[:product]][0] / CharSettings['kill time'][npc][recipe[:product]][1].to_f
-					tracker[:kill_for][recipe[:product]] = tracker[:kill_for][recipe[:product]].to_i + 1
+					foo = CharSettings['kill time'][npc][recipe[:product]][0] / CharSettings['kill time'][npc][recipe[:product]][1].to_f
+					tracker[:time] += foo
+					tracker[:itime][recipe[:product]] = tracker[:itime][recipe[:product]].to_i + foo
+					tracker[:kill_for][npc][recipe[:product]] = tracker[:kill_for][npc][recipe[:product]].to_i + 1
 				else
 					tracker[:error]['attack-script'] = 1
 				end
 			end
 		elsif step =~ /^light/
-#			unless top_level
-#				tracker[:recipe_count][recipe[:product]] = tracker[:recipe_count][recipe[:product]].to_i + 1
-#			end
-			unless (checkroom == '[A Secluded Corner]') or GameObj.room_desc.any? { |obj| obj.noun == 'cauldron' } or GameObj.loot.any? { |obj| obj.noun =~ /^(?:cauldron|vat|kettle)$/ } or all_sack_contents.call.any? { |obj| obj.noun =~ /^(?:cauldron|vat|kettle)$/ }
+			unless (checkroom == '[A Secluded Corner]') or GameObj.room_desc.any? { |obj| obj.noun == 'cauldron' } or GameObj.loot.any? { |obj| obj.noun =~ cauldron_noun } or all_sack_contents.call.any? { |obj| obj.noun =~ cauldron_noun }
 				tracker[:error]['cauldron'] = 1
 			end
 		elsif step =~ /^special/
@@ -1035,6 +1210,8 @@ recursive_check_recipe = proc { |recipe,tracker,top_level|
 		else
 			echo "warning: unkown step: #{step}"
 		end
+		recursive_padding -= 3
+		respond "#{''.ljust(recursive_padding)}end step: #{step}: #{Time.now - step_start}" if $alchemy_debug
 	}
 	if top_level
 		tracker[:recipe_count][recipe[:product]] = tracker[:recipe_count][recipe[:product]].to_i + 1
@@ -1046,21 +1223,28 @@ recursive_check_recipe = proc { |recipe,tracker,top_level|
 	if recipe[:product] =~ /^(?:s'|t')?ayanad crystal$/
 		tracker[:extra_ingredients].push(recipe[:product])
 	end
+	recursive_padding -= 3
+	respond "#{''.ljust(recursive_padding)}end recipe: #{recipe[:product]}: #{Time.now - recipe_start}" if $alchemy_debug
 	tracker
 }
 
-check_recipe = proc { |recipe_name,repetitions|
-	tracker = { :error => Hash.new, :recipe_count => Hash.new, :claimed_ingredients => Array.new, :ingredient_count => ingredient_count.dup, :extra_ingredients => Array.new, :found => Hash.new, :buy => Hash.new, :forage => Hash.new, :kill_for => Hash.new, :steps => Array.new, :prepare_steps => Array.new, :finish_steps => Array.new, :cost => 0, :time => 0 }
-	if recipe_name.class == Array
-		recipe_list = $alchemy_recipes.find_all { |recipe| recipe_name.include?(recipe[:product]) }
-	else
-		recipe_list = $alchemy_recipes.find_all { |recipe| recipe[:product] == recipe_name }
+check_recipe = proc { |args|
+	if args[:name]
+		recipe_list = $alchemy_recipes.find_all { |recipe| recipe[:product] == args[:name] }
+	elsif args[:names]
+		recipe_list = $alchemy_recipes.find_all { |recipe| args[:names].include?(recipe[:product]) }
+	elsif args[:recipe]
+		recipe_list = [ args[:recipe] ]
+	elsif args[:recipes]
+		recipe_list = args[:recipes]
 	end
-	repetitions.times {
+	tracker = { :error => Hash.new, :recipe_count => Hash.new, :claimed_ingredients => Array.new, :ingredient_count => ingredient_count.dup, :extra_ingredients => Array.new, :found => Hash.new, :buy => Hash.new, :forage => Hash.new, :kill_for => Hash.new, :steps => Array.new, :prepare_steps => Array.new, :finish_steps => Array.new, :cost => 0, :time => 0, :itime => Hash.new, :icost => Hash.new }
+	args[:reps] ||= 1
+	args[:reps].times {
 		if recipe_list.length > 0
 			tracker_list = Array.new
 			for recipe in recipe_list
-				temp_tracker = { :error => tracker[:error].dup, :recipe_count => tracker[:recipe_count].dup, :claimed_ingredients => tracker[:claimed_ingredients].dup, :ingredient_count => tracker[:ingredient_count].dup, :extra_ingredients => tracker[:extra_ingredients].dup, :found => tracker[:found].dup, :buy => tracker[:buy].dup, :forage => tracker[:forage].dup, :kill_for => tracker[:kill_for].dup, :steps => tracker[:steps].dup, :prepare_steps => tracker[:prepare_steps].dup, :finish_steps => tracker[:finish_steps].dup, :cost => tracker[:cost], :time => tracker[:time] }
+				temp_tracker = { :error => tracker[:error].dup, :recipe_count => tracker[:recipe_count].dup, :claimed_ingredients => tracker[:claimed_ingredients].dup, :ingredient_count => tracker[:ingredient_count].dup, :extra_ingredients => tracker[:extra_ingredients].dup, :found => tracker[:found].dup, :buy => tracker[:buy].dup, :forage => tracker[:forage].dup, :kill_for => tracker[:kill_for].dup, :steps => tracker[:steps].dup, :prepare_steps => tracker[:prepare_steps].dup, :finish_steps => tracker[:finish_steps].dup, :cost => tracker[:cost], :time => tracker[:time], :itime => tracker[:itime].dup, :icost => tracker[:icost].dup }
 				temp_tracker = recursive_check_recipe.call(recipe, temp_tracker, top_level=true)
 				tracker_list.push(temp_tracker)
 				ingredient_count.each_pair { |ingredient_id,count| tracker[:ingredient_count][ingredient_id] ||= count }
@@ -1084,31 +1268,76 @@ check_recipe = proc { |recipe_name,repetitions|
 	tracker
 }
 
+other_check_recipe = proc { |recipe,repetitions|
+	tracker = { :error => Hash.new, :recipe_count => Hash.new, :claimed_ingredients => Array.new, :ingredient_count => ingredient_count.dup, :extra_ingredients => Array.new, :found => Hash.new, :buy => Hash.new, :forage => Hash.new, :kill_for => Hash.new, :steps => Array.new, :prepare_steps => Array.new, :finish_steps => Array.new, :cost => 0, :time => 0, :itime => Hash.new, :icost => Hash.new }
+	repetitions.times {
+		tracker_list = Array.new
+		temp_tracker = { :error => tracker[:error].dup, :recipe_count => tracker[:recipe_count].dup, :claimed_ingredients => tracker[:claimed_ingredients].dup, :ingredient_count => tracker[:ingredient_count].dup, :extra_ingredients => tracker[:extra_ingredients].dup, :found => tracker[:found].dup, :buy => tracker[:buy].dup, :forage => tracker[:forage].dup, :kill_for => tracker[:kill_for].dup, :steps => tracker[:steps].dup, :prepare_steps => tracker[:prepare_steps].dup, :finish_steps => tracker[:finish_steps].dup, :cost => tracker[:cost], :time => tracker[:time], :itime => tracker[:itime].dup, :icost => tracker[:icost].dup }
+		temp_tracker = recursive_check_recipe.call(recipe, temp_tracker, top_level=true)
+		tracker_list.push(temp_tracker)
+		ingredient_count.each_pair { |ingredient_id,count| tracker[:ingredient_count][ingredient_id] ||= count }
+		tracker_list.sort! { |a,b| (a[:cost] + (a[:time] * CharSettings['cost-per-second'])) <=> (b[:cost] + (b[:time] * CharSettings['cost-per-second'])) }
+		tracker = tracker_list.find { |t| t[:error].empty? } || tracker_list.first
+	}
+	fixed_buy = Hash.new
+	tracker[:buy].each_pair { |where_what,how_many|
+		where, what = where_what.split(';')
+		fixed_buy[where] ||= Hash.new
+		fixed_buy[where][what] = how_many
+	}
+	tracker[:buy] = fixed_buy
+	tracker.delete(:claimed_ingredients)
+	tracker.delete(:ingredient_count)
+	tracker.delete(:extra_ingredients)
+	tracker
+}
+
 show_check = proc { |check_info|
 	output = "\n"
 	output.concat check_info[:recipe_count].collect { |n,c| if c == 1; n; else; "#{n} (#{c})"; end }.join(', ').to_s
 	output.concat "\n"
+	max_width = 0
+	check_info[:found].each_pair { |n,c| max_width = [ max_width, n.sub(/s*\#.*$/, '').length ].max }
+	check_info[:forage].each_pair { |n,c| max_width = [ max_width, n.sub(/s*\#.*$/, '').length ].max }
+	check_info[:kill_for].each { |npc,foo| foo.each_pair { |n,c| max_width = [ max_width, n.sub(/s*\#.*$/, '').length ].max } }
+	check_info[:buy].values.each { |place| place.each_pair { |n,c| max_width = [ max_width, n.sub(/s*\#.*$/, '').length ].max } }
 	unless check_info[:found].empty?
 		output.concat "   have:\n"
 		check_info[:found].each_pair { |n,c|
-			output.concat "      #{n.sub(/s*\#.*$/, '')}"
-			output.concat " (#{c})" if c > 1
-			output.concat "\n"
-		}
-	end
-	unless check_info[:forage].empty?
-		output.concat "   forage:\n"
-		check_info[:forage].each_pair { |n,c|
-			output.concat "      #{n.sub(/s*\#.*$/, '')}"
-			output.concat " (#{c})" if c > 1
+			str = n.sub(/s*\#.*$/, '')
+			str.concat " (#{c})" if c > 1
+			output.concat "      #{str.ljust(max_width+8)}"
+			if $alchemy_reagent_op_cost[n]
+				output.concat add_commas.call(trading_sell.call($alchemy_reagent_op_cost[n])*c).rjust(7)
+			else
+				output.concat '      -'
+			end
 			output.concat "\n"
 		}
 	end
 	unless check_info[:kill_for].empty?
 		output.concat "   kill for:\n"
-		check_info[:kill_for].each_pair { |n,c|
-			output.concat "      #{n.sub(/s*\#.*$/, '')}"
-			output.concat " (#{c})" if c > 1
+		check_info[:kill_for].each_pair { |npc,foo|
+			foo.each_pair { |n,c|
+				str = n.sub(/s*\#.*$/, '')
+				str.concat " (#{c})" if c > 1
+				output.concat "      #{str.ljust(max_width + 8)}"
+				if bar = check_info[:itime][n]
+					output.concat((bar/60.0).as_time)
+				end
+				output.concat "\n"
+			}
+		}
+	end
+	unless check_info[:forage].empty?
+		output.concat "   forage:\n"
+		check_info[:forage].each_pair { |n,c|
+			str = n.sub(/s*\#.*$/, '')
+			str.concat " (#{c})" if c > 1
+			output.concat "      #{str.ljust(max_width + 8)}"
+			if foo = check_info[:itime][n]
+				output.concat((foo/60.0).as_time)
+			end
 			output.concat "\n"
 		}
 	end
@@ -1116,8 +1345,12 @@ show_check = proc { |check_info|
 		output.concat "   buy:\n"
 		check_info[:buy].values.each { |place|
 			place.each_pair { |n,c|
-				output.concat "      #{n.sub(/s*\#.*$/, '')}"
-				output.concat " (#{c})" if c > 1
+				str = n.sub(/s*\#.*$/, '')
+				str.concat " (#{c})" if c > 1
+				output.concat "      #{str.ljust(max_width + 8)}"
+				if foo = check_info[:icost][n]
+					output.concat add_commas.call(foo).rjust(7)
+				end
 				output.concat "\n"
 			}
 		}
@@ -1130,7 +1363,7 @@ show_check = proc { |check_info|
 			output.concat "\n"
 		}
 	end
-	output.concat "\ncost: #{check_info[:cost]}, time: #{(check_info[:time]/60.0).as_time}\n\n"
+	output.concat "\ncost: #{add_commas.call(check_info[:cost])}   time: #{(check_info[:time]/60.0).as_time}\n\n"
 	if defined?(_respond)
 		_respond output
 	else
@@ -1212,10 +1445,10 @@ do_steps = proc { |steps|
 			if action == 'add'
 				dothis "put ##{ingredient.id} in #{cauldron.noun || 'cauldron'}", /^You place|^You pour/
 				if GameObj.right_hand.name == 'empty flask'
-					dothis "put ##{GameObj.right_hand.id} in ##{alchemy_sack.call.id}", /^You put|^I could not find what you were referring to\./
+					dothis "put ##{GameObj.right_hand.id} in ##{alchemy_sack.call.id}", put_regex
 					need_empty_flask = true
 				elsif GameObj.left_hand.name == 'empty flask'
-					dothis "put ##{GameObj.left_hand.id} in ##{alchemy_sack.call.id}", /^You put|^I could not find what you were referring to\./
+					dothis "put ##{GameObj.left_hand.id} in ##{alchemy_sack.call.id}", put_regex
 					need_empty_flask = true
 				end
 			elsif action == 'grind'
@@ -1223,8 +1456,8 @@ do_steps = proc { |steps|
 					dothis 'swap', /^You swap/
 				end
 				mortar = all_sack_contents.call.find { |obj| obj.noun == 'mortar' }
-				dothis "get ##{mortar.id}", /^You remove|^You already have that/
-				dothis "put ##{ingredient.id} in ##{mortar.id}", /^You put|^I could not find what you were referring to\./
+				dothis "get ##{mortar.id}", get_regex
+				dothis "put ##{ingredient.id} in ##{mortar.id}", put_regex
 				loop {
 					haste = Spell[506]
 					haste.cast if haste.known? and haste.affordable? and not haste.active?
@@ -1237,7 +1470,7 @@ do_steps = proc { |steps|
 							error = true
 							break
 						end
-						dothis "_drag ##{pestle.id} ##{mortar.id}", /^You put|^I could not find what you were referring to\./
+						dothis "_drag ##{pestle.id} ##{mortar.id}", put_regex
 					elsif grind_result =~ /appears to be as ground as it'?s going to get|^Grind what/
 						break
 					end
@@ -1248,9 +1481,9 @@ do_steps = proc { |steps|
 				end
 				for item in mortar.contents
 					next if item.noun == 'pestle'
-					dothis "_drag ##{item.id} ##{alchemy_sack.call.id}", /^You put|^I could not find what you were referring to\./
+					dothis "_drag ##{item.id} ##{alchemy_sack.call.id}", put_regex
 				end
-				dothis "put ##{mortar.id} in ##{alchemy_sack.call.id}", /^You put|^I could not find what you were referring to\./
+				dothis "put ##{mortar.id} in ##{alchemy_sack.call.id}", put_regex
 			elsif action == 'extract'
 				unless checkright
 					dothis 'swap', /^You swap/
@@ -1325,9 +1558,9 @@ do_steps = proc { |steps|
 					echo 'waiting for mana...'
 					wait_until { mana >= 10 }
 				end
-				boil_result = dothis 'alchemy boil', /^You focus on the [\w\s\-]+ (?:cauldron|vat|kettle) and push mana into it.  The flame beneath it (flickers briefly, but then dies down|quickly flares up wildly, bringing the contents to a rolling boil)\.$/
+				boil_result = dothis 'alchemy boil', /^You focus on the [\w\s\-]+ (?:cauldron|vat|kettle|boiler) and push mana into it.  The flame beneath it (flickers briefly, but then dies down|quickly flares up wildly, bringing the contents to a rolling boil)\.$/
 				waitrt?
-				break if boil_result =~ /^You focus on the [\w\s\-]+ (?:cauldron|vat|kettle) and push mana into it.  The flame beneath it quickly flares up wildly, bringing the contents to a rolling boil\.$/
+				break if boil_result =~ /^You focus on the [\w\s\-]+ (?:cauldron|vat|kettle|boiler) and push mana into it.  The flame beneath it quickly flares up wildly, bringing the contents to a rolling boil\.$/
 			}
 		elsif step == 'simmer'
 			loop {
@@ -1335,7 +1568,7 @@ do_steps = proc { |steps|
 					echo 'waiting for mana...'
 					wait_until { mana >= 10 }
 				end
-				# simmer_result = dothis 'alchemy simmer', /^You focus on the [\w\s\-]+ (?:cauldron|vat|kettle) and gently push mana into it\.  The flame beneath it (flickers briefly, but then dies down|quickly flares to life, bringing the contents to a slow simmer)\.$/
+				# simmer_result = dothis 'alchemy simmer', /^You focus on the [\w\s\-]+ (?:cauldron|vat|kettle|boiler) and gently push mana into it\.  The flame beneath it (flickers briefly, but then dies down|quickly flares to life, bringing the contents to a slow simmer)\.$/
 				simmer_result = dothis 'alchemy simmer', /flickers briefly, but then dies down|quickly flares to life, bringing the contents to a slow simmer/
 				waitrt?
 				break if simmer_result =~ /quickly flares to life, bringing the contents to a slow simmer/
@@ -1383,17 +1616,17 @@ do_steps = proc { |steps|
 				error = true
 				break
 			end
-			dothistimeout "get ##{lens.id}", 10, /^You remove|^You already have that/
+			dothistimeout "get ##{lens.id}", 10, get_regex
 			dothistimeout 'alchemy refract', 10, /^The surface of the solution in .* shimmers in response!/
 			waitrt?
-			dothistimeout "put ##{lens.id} in ##{alchemy_sack.call.id}", 10, /^You put|^I could not find what you were referring to\./
+			dothistimeout "put ##{lens.id} in ##{alchemy_sack.call.id}", 10, put_regex
 		elsif step == 'seal'
 			unless mana >= 20
 				echo 'waiting for mana...'
 				wait_until { mana >= 20 }
 			end
 			if need_empty_flask
-				dothis "get empty flask from ##{alchemy_sack.call.id}", /^You remove|^Get what\?/
+				dothis "get empty flask from ##{alchemy_sack.call.id}", get_regex
 			end
 			fput "look in #{cauldron.noun || 'cauldron'}"
 			dothis 'alchemy seal', /^You hold your hands over/
@@ -1405,19 +1638,19 @@ do_steps = proc { |steps|
 		elsif step == 'special'
 			vial = all_sack_contents.call.find { |obj| obj.name =~ sea_water_vial }
 			flask = all_sack_contents.call.find { |obj| obj.name =~ sea_water_flask }
-			dothis "get ##{vial.id}", /^You remove|^You already have that/
-			dothis "get ##{flask.id}", /^You remove|^You already have that/
+			dothis "get ##{vial.id}", get_regex
+			dothis "get ##{flask.id}", get_regex
 			dothis "open ##{flask.id}", /^You gently twist the stopper on the flask|^It's already open\.$/
-			pour_result = dothis "pour ##{flask.id} in ##{vial.id}", /^You pour|^It looks like your glass vial is already full\.$|^But your crystal flask is empty!$/
-			if pour_result == 'But your crystal flask is empty!'
-				dothis "put ##{vial.id} in ##{alchemy_sack.call.id}", /^You put|^I could not find what you were referring to\./
+			pour_result = dothis "pour ##{flask.id} in ##{vial.id}", /^You pour|^It looks like your glass vial is already full\.$|^But your .*? flask is empty!$/
+			if pour_result =~ /But your .*? flask is empty!/
+				dothis "put ##{vial.id} in ##{alchemy_sack.call.id}", put_regex
 				get_cauldron.call
 				if room_id = where_is.call('alchemy sea water').first
 					return_room = Room.current
 					start_script 'go2', [ room_id.to_s ]
 					wait_while { running?('go2') }
 					dothis "collect water with ##{flask.id}", /under water until it is filled|is already filled/
-					dothis "get ##{vial.id}", /^You remove|^You already have that/
+					dothis "get ##{vial.id}", get_regex
 					dothis "collect water with ##{vial.id}", /under water until it is filled|is already filled/
 					start_script 'go2', [ return_room.id.to_s ]
 					wait_while { running?('go2') }
@@ -1428,7 +1661,7 @@ do_steps = proc { |steps|
 				end
 			end
 			dothis "close ##{flask.id}", /^You draw up the slick crystal cork|^It's already corked\.$/
-			dothis "put ##{flask.id} in ##{alchemy_sack.call.id}", /^You put|^I could not find what you were referring to\./
+			dothis "put ##{flask.id} in ##{alchemy_sack.call.id}", put_regex
 			unless is_workshop.call
 				return_room = Room.current
 				get_cauldron.call
@@ -1447,7 +1680,7 @@ do_steps = proc { |steps|
 				}
 				sleep 1
 				waitrt?
-				dothistimeout "put ##{vial.id} in ##{alchemy_sack.call.id}", 3, /^You put|^I could not find what you were referring to\./
+				dothistimeout "put ##{vial.id} in ##{alchemy_sack.call.id}", 3, put_regex
 				put_crap_away.call
 				if return_room
 					start_script 'go2', [ return_room.id.to_s ]
@@ -1505,20 +1738,24 @@ forage = proc { |forage_list|
 						presence.cast if presence.known? and presence.affordable? and not presence.active?
 					end
 					if (id = GameObj.right_hand.id)
-						dothis "put ##{id} in ##{herb_sack.call.id}", /^You put|^I could not find what you were referring to\./
+#						dothis "put ##{id} in ##{herb_sack.call.id}", put_regex
+						dothis "put ##{id} in ##{alchemy_sack.call.id}", put_regex
 					end
 					if (id = GameObj.left_hand.id)
-						dothis "put ##{id} in ##{herb_sack.call.id}", /^You put|^I could not find what you were referring to\./
+#						dothis "put ##{id} in ##{herb_sack.call.id}", put_regex
+						dothis "put ##{id} in ##{alchemy_sack.call.id}", put_regex
 					end
 					forage_result = dothistimeout "forage for #{name.sub(/^(?:cluster|layer|mass|sprig|handful) of |^luminescent |^black\-tipped /, '').sub(/^(?:some fetid )/, 'some ')}", 10, /^You forage|^You make so much noise that only the dead would not notice you thrashing about in your unsuccessful search\.$|^You stumble about in a fruitless attempt at foraging\.$|you are unable to find anything useful|^As you carefully forage around you (can find no hint|see no evidence) of what you are looking for(?: right now, though you are fairly certain this is where it can be found)?\.|^You begin to forage around when your hand comes into contact with something that stabs you in the finger\.$|^As you forage around you suddenly feel a sharp pain in your right hand!|^You begin to forage around when suddenly you feel a burning sensation in your hand\.$|^You fumble about so badly in your search that you can only hope no one was watching you\.$/
 					sleep 0.5
 					waitrt?
 					if forage_result =~ /^You forage briefly and manage to find/
 						if id = GameObj.right_hand.id
-							dothis "put ##{id} in ##{herb_sack.call.id}", /^You put|^I could not find what you were referring to\./
+#							dothis "put ##{id} in ##{herb_sack.call.id}", put_regex
+							dothis "put ##{id} in ##{alchemy_sack.call.id}", put_regex
 						end
 						if id = GameObj.left_hand.id
-							dothis "put ##{id} in ##{herb_sack.call.id}", /^You put|^I could not find what you were referring to\./
+#							dothis "put ##{id} in ##{herb_sack.call.id}", put_regex
+							dothis "put ##{id} in ##{alchemy_sack.call.id}", put_regex
 						end
 						if herb_doses[name]
 							forage_list[name] = forage_list[name] - herb_doses[name]
@@ -1574,31 +1811,32 @@ buy = proc { |shopping_list|
 	empty_hands
 	get_cauldron.call
 	for place,hash in shopping_list.dup
-		unless note = all_sack_contents.call.find { |obj| obj.name == note_name.call }
-			echo 'error: you are too poor for alchemy'
-			break
-		end
 		unless room_id = where_is.call(place).first
 			echo "error: don't know where #{place} is"
+			break
+		end
+		the_note_name = (note_name_from_place.call(Room[room_id].location) || note_name_from_place.call(place) || note_name.call)
+		unless note = all_sack_contents.call.find { |obj| obj.name == the_note_name }
+			echo "error: missing #{the_note_name}"
 			break
 		end
 		start_script 'go2', [ room_id.to_s ]
 		wait_while { running?('go2') }
 		if place =~ /^(?:Icemule|River's Rest) empath guild entrance$/
-			get_result = dothis "get ##{note.id}", /^You remove|^You already have that|^Get what\?/
+			get_result = dothis "get ##{note.id}", get_regex
 			for name,num in hash.dup
 				if name == 'vial of faintly glowing aelotoi tears'
 					num.times {
 						dothis 'buy aelotoi tears', /^A sales clerk .* Handing it to you/
-						dothis "put ##{GameObj.left_hand.id} in ##{alchemy_sack.call.id}", /^You put|^I could not find what you were referring to\./
+						dothis "put ##{GameObj.left_hand.id} in ##{alchemy_sack.call.id}", put_regex
 					}
 					shopping_list[place].delete(name)
 				end
 			end
-			dothis "put ##{note.id} in ##{alchemy_sack.call.id}", /^You put|^I could not find what you were referring to\./
+			dothis "put ##{note.id} in ##{alchemy_sack.call.id}", put_regex
 		else
 			menu = read_menu.call
-			get_result = dothis "get ##{note.id}", /^You remove|^You already have that|^Get what\?/
+			get_result = dothis "get ##{note.id}", get_regex
 			if get_result =~ /^Get what\?/
 				echo "error: can't find bank note"
 				break
@@ -1627,7 +1865,11 @@ buy = proc { |shopping_list|
 					dothis "empty my package in ##{alchemy_sack.call.id}", /everything falls in/
 					waitrt?
 					dothis 'throw my package', /^You throw away/
-					shopping_list[place][name] -= 10
+					if herb_doses[name]
+						shopping_list[place][name] -= (herb_doses[name] * 10)
+					else
+						shopping_list[place][name] -= 10
+					end
 				}
 				num = num % 10
 				if num > 1
@@ -1637,17 +1879,25 @@ buy = proc { |shopping_list|
 					dothis "empty my package in ##{alchemy_sack.call.id}", /everything falls in/
 					waitrt?
 					dothis 'throw my package', /^You throw away/
-					shopping_list[place][name] -= num
+					if herb_doses[name]
+						shopping_list[place][name] -= (herb_doses[name] * num)
+					else
+						shopping_list[place][name] -= num
+					end
 				elsif num == 1
 					dothis "order #{order_number}", /BUY/
 					fput 'buy'
 					100.times { break if checkleft; sleep 0.1 }
-					dothis "put ##{GameObj.left_hand.id} in ##{alchemy_sack.call.id}", /^You put|^I could not find what you were referring to\./
-					shopping_list[place][name] -= 1
+					dothis "put ##{GameObj.left_hand.id} in ##{alchemy_sack.call.id}", put_regex
+					if herb_doses[name]
+						shopping_list[place][name] -= (herb_doses[name] * 1)
+					else
+						shopping_list[place][name] -= 1
+					end
 				end
-				shopping_list[place].delete(name) if shopping_list[place][name] == 0
+				shopping_list[place].delete(name) if shopping_list[place][name] < 1
 			end
-			dothis "put ##{note.id} in ##{alchemy_sack.call.id}", /^You put|^I could not find what you were referring to\./
+			dothis "put ##{note.id} in ##{alchemy_sack.call.id}", put_regex
 		end
 		shopping_list.delete(place) if shopping_list[place].empty?
 	end
@@ -1664,66 +1914,68 @@ kill_for = proc { |kill_for_list|
 			start_script(CharSettings['before-hunt-script'])
 			wait_while { running?(CharSettings['before-hunt-script']) }
 		end
-		for ingredient_name,count in kill_for_list.dup
-			recipe_list = $alchemy_recipes.find_all { |r| (r[:product] == ingredient_name) and (r[:steps].first =~ /^kill/) }
-			target_list = recipe_list.collect { |r| /^kill\s+(.+)/.match(r[:steps].first).captures.first }
-			wander_room_list = Array.new
-			target_list.each { |t| wander_room_list.concat(where_is.call(t).collect { |num| num.to_s }) }
-			seen_targets = Array.new
-			start_kill_room = wander_room_list.first
-			if start_kill_room
-				current_ingredient_count = start_ingredient_count = all_sack_contents.call.find_all { |obj| obj.name == ingredient_name }.length
-				start_script 'go2', [ start_kill_room.to_s ]
-				wait_while { running?('go2') }
-				start_time = Time.now
-				$alchemy_abort_room = false
-				$alchemy_abort_hunt = false
-				start_hunt_time = Time.now
-				while (Time.now - start_hunt_time) < CharSettings['max-hunt-time']
-					sleep 0.1
-					wander.call
-					next if checkpcs
-					next if GameObj.loot.find { |obj| (obj.noun == 'disk') and (obj.name !~ /#{Char.name}/) }
+		for npc,foo in kill_for_list.dup
+			for ingredient_name,count in foo.dup
+				recipe_list = $alchemy_recipes.find_all { |r| (r[:product] == ingredient_name) and (r[:steps].first =~ /^kill/) }
+				target_list = recipe_list.collect { |r| /^kill\s+(.+)/.match(r[:steps].first).captures.first }
+				wander_room_list = where_is.call(npc).collect { |num| num.to_s }
+				start_kill_room = wander_room_list.first
+				if start_kill_room
+					current_ingredient_count = start_ingredient_count = all_sack_contents.call.find_all { |obj| obj.name == ingredient_name }.length
+					start_script 'go2', [ start_kill_room.to_s ]
+					wait_while { running?('go2') }
+					start_time = Time.now
+					$alchemy_abort_room = false
+					$alchemy_abort_hunt = false
+					start_hunt_time = Time.now
 					while (Time.now - start_hunt_time) < CharSettings['max-hunt-time']
-						target_ids = GameObj.npcs.find_all { |npc| target_list.include?(npc.name) and (npc.status !~ /dead/) }.collect { |npc| npc.id }
-						if target_ids.length > 0
-							if checkrt > 0 or checkcastrt > 0
-								sleep 0.1
-							else
-								seen_targets = (seen_targets | (GameObj.npcs.to_a.collect { |npc| npc.name } & target_list))
-								start_script(CharSettings['attack-script'], target_ids)
-								wait_while { running?(CharSettings['attack-script']) }
-								if $alchemy_abort_room or $alchemy_abort_hunt
-									$alchemy_abort_room = false
-									break
+						wander.call
+						sleep 0.1
+						next if checkpcs
+						next if GameObj.loot.find { |obj| (obj.noun == 'disk') and (obj.name !~ /#{Char.name}/) }
+						if GameObj.npcs.nil?
+							sleep 0.1 + (rand(10)/10.0)
+							next if GameObj.npcs.nil?
+						end
+						while (Time.now - start_hunt_time) < CharSettings['max-hunt-time']
+							target_ids = GameObj.npcs.find_all { |npc| target_list.include?(npc.name) and (npc.status !~ /dead/) }.collect { |npc| npc.id }
+							if target_ids.length > 0
+								if checkrt > 0 or checkcastrt > 0
+									sleep 0.1
+								else
+									start_script(CharSettings['attack-script'], target_ids)
+									wait_while { running?(CharSettings['attack-script']) }
+									if $alchemy_abort_room or $alchemy_abort_hunt
+										$alchemy_abort_room = false
+										break
+									end
 								end
+							else
+								break
 							end
-						else
-							break
+							if $alchemy_abort_hunt
+								$alchemy_abort_hunt = false
+								break
+							end
 						end
-						if $alchemy_abort_hunt
-							$alchemy_abort_hunt = false
-							break
-						end
+						current_ingredient_count = all_sack_contents.call.find_all { |obj| obj.name == ingredient_name }.length
+						break unless current_ingredient_count < start_ingredient_count + count
+						break if Time.now - start_time > CharSettings['max-hunt-time']
 					end
-					current_ingredient_count = all_sack_contents.call.find_all { |obj| obj.name == ingredient_name }.length
-					break unless current_ingredient_count < start_ingredient_count + count
-					break if Time.now - start_time > CharSettings['max-hunt-time']
-				end
-				end_time = Time.now
-				CharSettings['kill time'] ||= Hash.new
-				for npc in seen_targets
+					end_time = Time.now
+					CharSettings['kill time'] ||= Hash.new
 					CharSettings['kill time'][npc] ||= Hash.new
 					if CharSettings['kill time'][npc][ingredient_name].nil?
 						CharSettings['kill time'][npc][ingredient_name] = [ 1, 1 ]
 					end
-					CharSettings['kill time'][npc][ingredient_name][0] += (end_time - start_time) / seen_targets.length.to_f
-					CharSettings['kill time'][npc][ingredient_name][1] += (current_ingredient_count - start_ingredient_count) / seen_targets.length.to_f
+					CharSettings['kill time'][npc][ingredient_name][0] += (end_time - start_time)
+					CharSettings['kill time'][npc][ingredient_name][1] += (current_ingredient_count - start_ingredient_count)
+					kill_for_list[npc][ingredient_name] = kill_for_list[npc][ingredient_name] - (current_ingredient_count - start_ingredient_count)
+					kill_for_list[npc].delete(ingredient_name) if kill_for_list[npc][ingredient_name] < 1
+					kill_for_list.delete(npc) if kill_for_list[npc].empty?
+				else
+					echo 'error: kill: failed to find starting room'
 				end
-				kill_for_list[ingredient_name] = kill_for_list[ingredient_name] - (current_ingredient_count - start_ingredient_count)
-				kill_for_list.delete(ingredient_name) if kill_for_list[ingredient_name] < 1
-			else
-				echo 'error: kill: failed to find starting room'
 			end
 		end
 		if CharSettings['after-hunt-script']
@@ -1744,21 +1996,21 @@ go_get_crap = proc { |check_info|
 		unless check_info[:kill_for].empty?
 			check_info[:kill_for] = kill_for.call(check_info[:kill_for])
 			unless check_info[:kill_for].empty?
-				echo "error: failed to find: #{check_info[:kill_for].keys.join(', ')}"
+				echo "error: failed to find: #{check_info[:kill_for].values.inspect}"
 				error = true
 			end
 		end
 		unless error or check_info[:forage].empty?
 			check_info[:forage] = forage.call(check_info[:forage])
 			unless check_info[:forage].empty?
-				echo "error: failed to find: #{check_info[:forage].keys.join(', ')}"
+				echo "error: failed to find: #{check_info[:forage].inspect}"
 				error = true
 			end
 		end
 		unless error or check_info[:buy].empty?
 			check_info[:buy] = buy.call(check_info[:buy])
 			unless check_info[:buy].empty?
-				echo "error: failed to buy: #{check_info[:buy].keys.join(', ')}"
+				echo "error: failed to buy: #{check_info[:buy].inspect}"
 				error = true
 			end
 		end
@@ -1807,16 +2059,13 @@ do_task_assembly = proc {
 }
 
 do_task_distill = proc {
-	room_list = where_is.call("#{Char.prof.downcase} alchemy workshop")
-	if room_list.length > 0
-		if room_list.include?(Room.current.id)
-			return_room = nil
-		else
-			return_room = Room.current
-			get_cauldron.call
-			start_script 'go2', [ room_list.first.to_s ]
-			wait_while { running?('go2') }
-		end
+	return_room = nil
+	unless is_workshop.call
+		return_room = Room.current
+		get_cauldron.call
+		go_empty_workshop.call
+	end
+	if is_workshop.call
 		haste = Spell[506]
 		loop {
 			haste.cast if haste.known? and haste.affordable? and not haste.active?
@@ -1964,7 +2213,7 @@ do_task_grind = proc {
 		start_script 'go2', [ room_id.to_s ]
 		wait_while { running?('go2') }
 		haste = Spell[506]
-		clerk = checknpcs.find { |npc_name| npc_name =~ /^clerk$|acolyte$|^hobgoblin$|^gnome$|^apothecary$/ } || 'clerk'
+		clerk = checknpcs.find { |npc_name| npc_name =~ /^clerk$|acolyte$|^hobgoblin$|^gnome$|^apothecary$|^apprentice$/ } || 'clerk'
 		empty_hands
 		result = dothis 'get mortars', /^You take|^You already have a stone mortar|^Get what\?/
 		if result =~ /^Get what\?/
@@ -1974,18 +2223,18 @@ do_task_grind = proc {
 		loop {
 			script.want_downstream = false
 			script.want_downstream_xml = true
-			contents_line = dothis "look on ##{shelf.id}", /On the .*? you see|There is nothing on there\./
+			contents_line = dothis "look on ##{shelf.id}", /On the .*? you see|There is nothing on there\.|^<pushBold\/>Special/
 			if contents_line =~ /There is nothing on there\./
 				script.want_downstream = true
 				script.want_downstream_xml = false
 				dothistimeout "ask #{clerk} about ingredients", 10, /^You ask the .*? about ingredients\.$/
 				script.want_downstream = false
 				script.want_downstream_xml = true
-				contents_line = dothis "look on ##{shelf.id}", /On the .*? you see|There is nothing on there$/
+				contents_line = dothis "look on ##{shelf.id}", /On the .*? you see|There is nothing on there$|^<pushBold\/>Special/
 			end
 			script.want_downstream = true
 			script.want_downstream_xml = false
-			grindable_id, grindable_noun = /you see .*?<a exist="(.*?)" noun="(.*?)"/.match(contents_line).captures[0..1]
+			grindable_id, grindable_noun = /(?:you see|<pushBold\/>Special.*?<popBold\/>) .*?<a exist="(.*?)" noun="(.*?)"/.match(contents_line).captures[0..1]
 			get_result = dothistimeout "get ##{grindable_id}", 10, /^You take/
 			if get_result
 				loop {			
@@ -2018,7 +2267,7 @@ do_task_grind_mine = proc {
 	check_list = Array.new
 	recipe_list = $alchemy_recipes.find_all { |recipe| (recipe[:steps].first =~ /^grind/) and not $alchemy_grind_history.keys.include?(recipe[:product]) }
 	for recipe in recipe_list
-		tracker = { :error => Hash.new, :recipe_count => Hash.new, :claimed_ingredients => Array.new, :ingredient_count => ingredient_count.dup, :extra_ingredients => Array.new, :found => Hash.new, :buy => Hash.new, :forage => Hash.new, :kill_for => Hash.new, :steps => Array.new, :prepare_steps => Array.new, :finish_steps => Array.new, :cost => 0, :time => 0 }
+		tracker = { :error => Hash.new, :recipe_count => Hash.new, :claimed_ingredients => Array.new, :ingredient_count => ingredient_count.dup, :extra_ingredients => Array.new, :found => Hash.new, :buy => Hash.new, :forage => Hash.new, :kill_for => Hash.new, :steps => Array.new, :prepare_steps => Array.new, :finish_steps => Array.new, :cost => 0, :time => 0, :itime => Hash.new, :icost => Hash.new }
 		tracker = recursive_check_recipe.call(recipe, tracker, top_level=true)
 		fixed_buy = Hash.new
 		tracker[:buy].each_pair { |where_what,how_many|
@@ -2071,24 +2320,43 @@ do_task = proc { |type|
 				if checkpoison # fixme: failed
 					echo "masters won't talk to you while you're poisoned..."
 					wait_while { checkpoison }
+					start_script 'go2', [ room_id.to_s ]
+					wait_while { running?('go2') }
 				end
 				dothistimeout "ask #{GameObj.npcs.last.noun} about training #{type}", 10, /^#{GameObj.npcs.last.noun}/
 				while line = get
-					if line =~ /try a recipe with (.*?) as a component/
+					if line =~ /First, we light the cauldron\.  Go ahead\.|Please #{XMLData.name}, LIGHT the cauldron/
+						fput 'light cauldron'
+					elsif line =~ /Excellent, now try to extinguish it\.|Please #{XMLData.name}, EXTINGUISH the cauldron\./
+						fput 'extinguish cauldron'
+					elsif line =~ /\[Use the ALCHEMY SEAL command to seal the solution inside the training cauldron\.\]|\[You can use the ALCHEMY verb to SEAL the mixture in the cauldron\.\]/
+						fput 'alchemy seal'
+					elsif line =~ /try a recipe with (.*?) as a component/
 						required_step = $1.downcase
-						recipe_list = gld_suggestions.call[type][:recipes]
-						recipe_list.delete_if { |recipe_name| !$alchemy_recipes.any? { |recipe| (recipe[:product] == recipe_name) and recipe[:steps].any? { |step| step =~ /^#{required_step}/ } } }
-						check_info = check_recipe.call(recipe_list, 1)
+						echo "required_step: #{required_step.inspect}" if $alchemy_debug
+						recipe_list = gld_suggestions.call[type][:recipes].dup
+						echo "recipe_list: #{recipe_list.inspect}" if $alchemy_debug
+						recipe_list.delete_if { |r| not r[:steps].any? { |step| step =~ /^#{required_step}/ } }
+						echo "recipe_list: #{recipe_list.inspect}" if $alchemy_debug
+						check_info = check_recipe.call(:recipes => recipe_list, :reps => 1)
 						if !check_info[:error].empty? or check_info[:steps].any? { |step| step =~ /^extract|^distill|^special/ } or not check_info[:buy].empty? or not check_info[:forage].empty? or not check_info[:kill_for].empty?
 							move 'out'
-							reps = gld.call[type][:reps]
+							if ((silvers = check_silvers.call) > 0) and room_id = where_is.call('bank').first
+								start_script 'go2', [ room_id.to_s ]
+								wait_while { running?('go2') }
+								fput "deposit #{silvers}"
+							end
+							reps = [gld.call[type][:reps], 3].min
 							while reps > 0
-								check_info = check_recipe.call(recipe_list, reps)
+								check_info = check_recipe.call(:recipes => recipe_list, :reps => reps)
+#								echo "reps: #{reps.inspect}"
+#								echo "check_info: #{check_info.inspect}"
 								break if check_info[:error].empty?
 								reps -= 1
 							end
 							if reps < 1
-								echo 'error: failed to find a decent recipe'
+								echo 'error: failed to find a decent recipe (use ";alchemy suggest" to help figure out why)'
+#								echo "gld_suggestions.call[type][:recipes]: #{gld_suggestions.call[type][:recipes].inspect}"
 								sleep 0.5
 								error = true
 								break
@@ -2106,6 +2374,12 @@ do_task = proc { |type|
 							if room_id = where_is.call("#{Char.prof.downcase} alchemy masters").first
 								start_script 'go2', [ room_id.to_s ]
 								wait_while { running?('go2') }
+								if checkpoison
+									echo "masters won't talk to you while you're poisoned..."
+									wait_while { checkpoison }
+									start_script 'go2', [ room_id.to_s ]
+									wait_while { running?('go2') }
+								end
 								dothistimeout "ask #{GameObj.npcs.last.noun} about training #{type}", 10, /^#{GameObj.npcs.last.noun}/
 							else
 								echo 'error: failed to find alchemy masters'
@@ -2119,6 +2393,11 @@ do_task = proc { |type|
 					elsif line == '[You have completed your training task.]'
 						invalid_gld.call
 						move 'out'
+						if ((silvers = check_silvers.call) > 0) and room_id = where_is.call('bank').first
+							start_script 'go2', [ room_id.to_s ]
+							wait_while { running?('go2') }
+							fput "deposit #{silvers}"
+						end
 						break
 					end
 				end
@@ -2127,7 +2406,7 @@ do_task = proc { |type|
 				error = true
 			end
 		elsif gld.call[type][:task] =~ /^practice creating tough solutions|follow some tough recipes and create some items|^practice (?:distilling|extracting) for reagents/
-			check_info = check_recipe.call(gld_suggestions.call[type][:recipes], gld_suggestions.call[type][:reps])
+			check_info = check_recipe.call(:recipes => gld_suggestions.call[type][:recipes], :reps => gld_suggestions.call[type][:reps])
 			if check_info[:error].empty?
 				get_cauldron.call
 				show_check.call(check_info)
@@ -2144,11 +2423,11 @@ do_task = proc { |type|
 					error = true
 				end
 			else
-				echo "warning: failed to find a decent recipe"
+				echo 'warning: failed to find a decent recipe (use ";alchemy suggest" to help figure out why)'
 				error = true
 			end
 		elsif gld.call[type][:task] =~ /^visit the cauldron workshop and practice making solutions/
-			check_info = check_recipe.call(gld_suggestions.call[type][:recipes], gld_suggestions.call[type][:reps])
+			check_info = check_recipe.call(:recipes => gld_suggestions.call[type][:recipes], :reps => gld_suggestions.call[type][:reps])
 			if check_info[:error].empty?
 				if cauldron_room_id = where_is.call("#{Char.prof.downcase} alchemy training cauldron").first
 					get_cauldron.call
@@ -2176,7 +2455,7 @@ do_task = proc { |type|
 					error = true
 				end
 			else
-				echo "warning: failed to find a decent recipe"
+				echo 'warning: failed to find a decent recipe (use ";alchemy suggest" to help figure out why)'
 				error = true
 			end
 		elsif gld.call[type][:task] == 'practice grinding various ingredients with a mortar and pestle'
@@ -2212,19 +2491,19 @@ top_off_jars = proc {
 		got_jar = false
 		for item in all_sack_contents.call.find_all { |obj| jar.after_name =~ /containing #{obj.name.sub('some ', '(?:some )?').sub('handful of ', '(?:handful of )?').sub('sprig of ', '(?:sprig of )?').sub('tooth', '(?:teeth|tooth)').sub('leaf', '(?:leaf|leaves)').sub(/y\b/, '(?:y|ie)').split(' ').join('s? ')}/ }
 			unless got_jar
-				dothis "get ##{jar.id}", /^You remove|^You already have that/
+				dothis "get ##{jar.id}", get_regex
 				got_jar = true
 			end
 			result = dothis "_drag ##{item.id} ##{jar.id}", /^You add|is full/
 			if result =~ /is full/
-				dothis "put ##{item.id} in ##{alchemy_sack.call.id}", /^You put|^I could not find what you were referring to\./
+				dothis "put ##{item.id} in ##{alchemy_sack.call.id}", put_regex
 				break
 			else
 				ingredient_count[jar.id] = ingredient_count[jar.id] + 1 unless ingredient_count[jar.id].nil?
 			end
 		end
 		if got_jar
-			dothis "put ##{jar.id} in ##{alchemy_sack.call.id}", /^You put|^I could not find what you were referring to\./
+			dothis "put ##{jar.id} in ##{alchemy_sack.call.id}", put_regex
 		end
 	end
 	fill_hands
@@ -2239,17 +2518,19 @@ look_in_jars = proc {
 
 throw_away = proc {
 	if room_id = where_is.call('trash').first
-		trash_items = loot_sack.call.contents.to_a.find_all { |obj| (obj.name =~ /^tincture of (?:acantha|tkaro|wolifrew|basal|ambrominas|ephlox|aloeas|cactacae|bolmara|pothinir|haphip|torban|calamia|sovyn|woth|brostheras)$|silvery potion|^flask of pure water$|^grot t'kel potion$|^spirit shard$|^handful of sea salt$|^some powdered|^some ground/) and (obj.name !~ /#{UserVars.needed_reagents}/) }
+#		trash_items = loot_sack.call.contents.to_a.find_all { |obj| (obj.name =~ /^tincture of (?:acantha|tkaro|wolifrew|basal|ambrominas|ephlox|aloeas|cactacae|bolmara|pothinir|haphip|torban|calamia|sovyn|woth|brostheras|yabathilium|talneo)$|silvery potion|^flask of pure water$|^grot t'kel potion$|^spirit shard$|^handful of sea salt$|^some powdered|^some ground/) and (obj.name !~ /#{UserVars.needed_reagents}/) }
+#		trash_items = [ loot_sack.call.contents.to_a + alchemy_sack.call.contents.to_a ].flatten.find_all { |obj| (obj.name =~ /^tincture of (?:acantha|tkaro|wolifrew|basal|ambrominas|ephlox|aloeas|cactacae|bolmara|pothinir|haphip|torban|calamia|sovyn|woth|brostheras|yabathilium|talneo)$|silvery potion|^flask of pure water$|^grot t'kel potion$|^spirit shard$|^handful of sea salt$|^some powdered|^some ground/) and (obj.name !~ /#{UserVars.needed_reagents}/) }
+		trash_items = [ loot_sack.call.contents.to_a + alchemy_sack.call.contents.to_a ].flatten.find_all { |obj| (obj.name =~ /^tincture of (?:acantha|tkaro|wolifrew|basal|ambrominas|ephlox|aloeas|cactacae|bolmara|pothinir|haphip|torban|calamia|sovyn|woth|brostheras|yabathilium|talneo)$|^flask of pure water$|^spirit shard$|^handful of sea salt$|^some powdered|^some ground/) and (obj.name !~ /#{UserVars.needed_reagents}/) }
 		unless trash_items.empty?
 			start_script 'go2', [ room_id.to_s ]
 			wait_while { running?('go2') }
 			if trash_container = GameObj.loot.find { |obj| obj.noun =~ /^(?:receptacle|bin|barrel|trashcan)$/ }
 				empty_hand
 				for item in trash_items
-					dothistimeout "get ##{item.id}", 3, /^You remove/
-					dothistimeout "put ##{item.id} in ##{trash_container.id}", 3, /^You put|^As you place|^There appears .*? significant value|^Are you crazy\?!\?  Do you know what that's worth!\?!/
+					dothistimeout "get ##{item.id}", 3, get_regex
+					dothistimeout "put ##{item.id} in ##{trash_container.id}", 3, put_regex
 					if (GameObj.right_hand.id == item.id) or (GameObj.left_hand.id == item.id)
-						dothistimeout "put ##{item.id} in ##{lootsack.call.id}", 3, /^You put/
+						dothistimeout "put ##{item.id} in ##{lootsack.call.id}", 3, put_regex
 					end
 				end
 				fill_hand
@@ -2261,7 +2542,8 @@ throw_away = proc {
 }
 
 sell = proc {
-	sell_items = loot_sack.call.contents.to_a.find_all { |obj| obj.name =~ /^(?:iron wand)$/ }
+#	sell_items = loot_sack.call.contents.to_a.find_all { |obj| obj.name =~ /^(?:iron wand|polished bloodwood wand)$/ }
+	sell_items = loot_sack.call.contents.to_a.find_all { |obj| obj.name =~ /^(?:polished bloodwood wand)$/ }
 	unless sell_items.empty?
 		if room_id = where_is.call('pawnshop').first
 			start_script 'go2', [ room_id.to_s ]
@@ -2277,7 +2559,7 @@ sell = proc {
 			echo 'warning: failed to find a pawnshop within max-travel-time'
 		end
 	end
-	sell_items = loot_sack.call.contents.to_a.find_all { |obj| obj.name =~ /^(?:pale green potion|dark shimmering oil|iridescent opal wand|some dull silvery dust|rohnuru potion|minor mana potion|sarmoc potion|minor mana potion|lesser mana potion|smooth crystalline wand|lesser health potion|glowing blue potion|clear potion|lesser mana regeneration potion|hazy glass vial|silvery potion)$/ or (obj.noun == 'vial' and obj.after_name == 'containing fine white powder') }
+	sell_items = loot_sack.call.contents.to_a.find_all { |obj| obj.name =~ /^(?:pale green potion|dark shimmering oil|iridescent opal wand|some dull silvery dust|rohnuru potion|minor mana potion|sarmoc potion|minor mana potion|lesser mana potion|smooth crystalline wand|lesser health potion|glowing blue potion|clear potion|lesser mana regeneration potion|hazy glass vial|silvery potion|pale sea\-green potion|lesser mana potion|some pale glimmering dust|scintillating pale blue potion|smooth stone talisman|lesser mana-well potion|prismatic oil|glowing red potion|dark translucent crystal|foggy grey crystal|blue bubbling potion|sky-blue potion|aquamarine potion|shadowy dark crystal wand|greater mana-well potion|greater mana potion|greater mana regeneration potion)$/ or (obj.noun == 'vial' and obj.after_name == 'containing fine white powder') }
 	unless sell_items.empty?
 		if room_id = where_is.call('consignment').first
 			start_script 'go2', [ room_id.to_s ]
@@ -2297,8 +2579,9 @@ sell = proc {
 
 buy_elusive = proc {
 	unless UserVars.needed_reagents.nil? or UserVars.needed_reagents.empty?
-		if note = all_sack_contents.call.find { |obj| obj.name == note_name.call }
-			if room_id = where_is.call('reagent shop').first and (adj_room_id = Room[room_id].wayto.keys.first) and (way = Room[adj_room_id].wayto[room_id.to_s]) and (way.class == String)
+		if room_id = where_is.call('reagent shop').first and (adj_room_id = Room[room_id].wayto.keys.first) and (way = Room[adj_room_id].wayto[room_id.to_s]) and (way.class == String)
+			the_note_name = (note_name_from_place.call(Room[room_id].location) || note_name_from_place.call(place) || note_name.call)
+			if note = all_sack_contents.call.find { |obj| obj.name == the_note_name }
 				start_script 'go2', [ adj_room_id ]
 				wait_while { running?('go2') }
 				move way
@@ -2321,7 +2604,7 @@ buy_elusive = proc {
 					unless table_contents.empty?
 						if table_contents.any? { |obj| obj.name =~ /#{UserVars.needed_reagents}/ }
 							empty_hands
-							dothistimeout "get ##{note.id}", 10, /^You remove|^You already have that\./
+							dothistimeout "get ##{note.id}", 10, get_regex
 							for obj in table_contents
 								if obj.name =~ /#{UserVars.needed_reagents}/
 									unless count[obj.name]
@@ -2348,11 +2631,11 @@ buy_elusive = proc {
 										count[obj.name] = count[obj.name].to_i + 1
 										fput 'unhide' if invisible?
 										fput "buy ##{obj.id}"
-										dothistimeout "put my #{obj.noun} in ##{alchemy_sack.call.id}", 10, /^You put|^I could not find what you were referring to\./
+										dothistimeout "put my #{obj.noun} in ##{alchemy_sack.call.id}", 10, put_regex
 									end
 								end
 							end
-							dothistimeout "put ##{note.id} in ##{alchemy_sack.call.id}", 10, /^You put|^I could not find what you were referring to\./
+							dothistimeout "put ##{note.id} in ##{alchemy_sack.call.id}", 10, put_regex
 							sleep 0.05
 							top_off_jars.call
 							empty_jar_list = alchemy_sack.call.contents.find_all { |obj| obj.noun =~ /^(?:jar|beaker|bottle)$/ and obj.after_name.nil? }
@@ -2363,17 +2646,17 @@ buy_elusive = proc {
 								important_stuff_count = important_stuff_count.sort { |a,b| b[1] <=> a[1] }.collect { |n| n[0] }
 								for empty_jar in empty_jar_list
 									if name = important_stuff_count.pop
-										dothistimeout "get ##{empty_jar.id}", 10, /^You remove|^You already have that/
+										dothistimeout "get ##{empty_jar.id}", 10, get_regex
 										for obj in all_sack_contents.call
 											if obj.name == name
 												result = dothistimeout "_drag ##{obj.id} ##{empty_jar.id}", 10, /^You add|^You put|is full/
 												if result =~ /is full/
-													dothistimeout "put ##{obj.id} in ##{alchemy_sack.call.id}", 10, /^You put|^I could not find what you were referring to\./
+													dothistimeout "put ##{obj.id} in ##{alchemy_sack.call.id}", 10, put_regex
 													break
 												end
 											end
 										end
-										dothistimeout "put ##{empty_jar.id} in ##{alchemy_sack.call.id}", 10, /^You put|^I could not find what you were referring to\./
+										dothistimeout "put ##{empty_jar.id} in ##{alchemy_sack.call.id}", 10, put_regex
 									end
 								end
 							end
@@ -2384,10 +2667,10 @@ buy_elusive = proc {
 					echo 'error: no table'
 				end
 			else
-				echo 'error: failed to find a reagent shop'
+				echo "error: missing #{the_note_name}"
 			end
 		else
-			echo 'error: you are too poor for alchemy'
+			echo 'error: failed to find a reagent shop'
 		end
 	end
 }
@@ -2403,9 +2686,25 @@ if script.vars[1].downcase == 'set'
 	elsif (script.vars[2] =~ /^(?:attack\-script|before\-hunt\-script|after\-hunt\-script|before\-forage\-script|after\-forage\-script)$/i) and script.vars[3]
 		CharSettings[script.vars[2].downcase] = script.vars[3]
 		echo 'setting saved'
+	elsif (script.vars[2].downcase == 'alchemysack') and script.vars[3]
+		UserVars.alchemysack = script.vars[3..-1].join(' ')
+		echo 'setting saved'
+	elsif (script.vars[2].downcase == 'lootsack') and script.vars[3]
+		UserVars.lootsack = script.vars[3..-1].join(' ')
+		echo 'setting saved'
+	elsif (script.vars[2].downcase == 'herbsack') and script.vars[3]
+		UserVars.herbsack = script.vars[3..-1].join(' ')
+		echo 'setting saved'
 	else
-		echo "you're doing it wrong"
-	end		
+		echo "you're doing it wrong; try #{$clean_lich_char}#{script.name} help"
+	end
+elsif script.vars[1].downcase == 'clear'
+	if (script.vars[2] =~ /^(?:attack\-script|before\-hunt\-script|after\-hunt\-script|before\-forage\-script|after\-forage\-script)$/i)
+		CharSettings[script.vars[2].downcase] = nil
+		echo 'setting cleared'
+	else
+		echo "you're doing it wrong; try #{$clean_lich_char}#{script.name} help"
+	end
 elsif script.vars[1].downcase == 'add'
 	if (script.vars[2].downcase == 'fav') and (search_string = script.vars[3..-1].join(' '))
 		matching_recipes = $alchemy_recipes.find_all { |r| r[:spell] == search_string }.collect { |r| r[:product] }
@@ -2474,27 +2773,39 @@ elsif script.vars[1].downcase == 'del'
 	end
 elsif script.vars[1].downcase == 'suggest'
 	output = "\n"
-	for type in [ 'alchemy', 'potions', 'trinkets' ]
+	for type in [ 'alchemy' , 'potions', 'trinkets' ]
 		output.concat "\n#{type}:\n"
 		if gld_suggestions.call[type][:recipes].nil? or gld_suggestions.call[type][:recipes].empty? or gld_suggestions.call[type][:reps].zero?
 			output.concat "   (none)\n"
 		else
 			max_recipe_name = 0
-			gld_suggestions.call[type][:recipes].each { |recipe_name| max_recipe_name = [max_recipe_name,recipe_name.length].max }
-			for recipe_name in gld_suggestions.call[type][:recipes]
-				recipe = $alchemy_recipes.find { |r| r[:product] == recipe_name }
-				output.concat "   #{recipe_name.ljust(max_recipe_name)}   ranks: #{recipe[:rank][0].to_s.rjust(2)}-#{recipe[:rank][1].to_s.rjust(2)}"
-				check = check_recipe.call(recipe_name, gld_suggestions.call[type][:reps])
-				output.concat "   cost: #{check[:cost].to_i.to_s.rjust(5)}   time: #{(check[:time]/60.0).as_time}"
+			recipe_list = gld_suggestions.call[type][:recipes]
+			recipe_list.each { |r| max_recipe_name = [max_recipe_name,r[:product].length].max }
+			recipe_output_list = Array.new
+			for recipe in recipe_list
+				start = Time.now
+				check = check_recipe.call(:recipe => recipe, :reps => gld_suggestions.call[type][:reps])
+				echo "#{recipe[:product]}: #{Time.now - start}" if $alchemy_debug
+				if check[:error].empty?
+					recipe_output = "   #{monsterbold_start}#{recipe[:product].ljust(max_recipe_name)}#{monsterbold_end}"
+				else
+					recipe_output = "   #{recipe[:product].ljust(max_recipe_name)}"
+				end
+				recipe_output.concat "   ranks: #{recipe[:rank][0].to_s.rjust(2)}-#{recipe[:rank][1].to_s.rjust(2)}"
+				recipe_output.concat "   cost: #{check[:cost].to_i.to_s.rjust(5)}   time: #{(check[:time]/60.0).as_time}"
 				has_step = Array.new
 				recipe[:steps].each { |step| if step =~ /^(boil|infuse|simmer|chant|distill|extract|channel)/ and not has_step.include?($1); has_step.push($1); end }
-				output.concat "   includes: #{has_step.join(', ')}" unless has_step.empty?
+				recipe_output.concat "   includes: #{has_step.sort.join(', ')}" unless has_step.empty?
+				recipe_output.concat "\n"
 				unless check[:error].empty?
-					missing = check[:error].collect { |a,b| "#{a} (#{b})" }
-					output.concat "   #{monsterbold_start}missing:#{monsterbold_end} #{missing.join(', ')}"
+					check[:error].each_pair { |thing,count|
+						recipe_output.concat "   #{''.ljust(max_recipe_name)}   missing: #{thing} (#{count})\n"
+					}
 				end
-				output.concat "\n"
+				recipe_output_list.push([check[:cost], recipe_output])
 			end
+			recipe_output_list.sort { |a,b| a[0] <=> b[0] }.each { |o| output.concat(o[1]) }
+			recipe_output_list = nil
 		end
 	end
 	output.concat "\n"
@@ -2541,7 +2852,7 @@ elsif script.vars[1] =~ /^(check|make|prepare)$/i and not script.vars[2].nil?
 		echo 'no matching recipe'
 		exit
 	end
-	check_info = check_recipe.call(recipe_name, repetitions)
+	check_info = check_recipe.call(:name => recipe_name, :reps => repetitions)
 	show_check.call(check_info)
 	if check_info[:error].empty? and not check_only
 		echo 'starting in 3 seconds...'
@@ -2593,26 +2904,6 @@ elsif script.vars[1].downcase == 'buy'
 	close_sacks.call
 elsif script.vars[1].downcase == 'need'
 	set_needed_reagents.call
-elsif script.vars[1].downcase == 'test'
-#	respond gld.call.inspect
-#	exit
-	all_reagents = Array.new
-	$alchemy_recipes.each { |recipe|
-		recipe[:steps].each { |step|
-			if step =~ /^(?:add|extract|distill|grind) (.+)$/
-				reagent = $1
-				all_reagents.push(reagent) unless all_reagents.include?(reagent)
-			end
-		}
-	}
-	all_reagents.delete_if { |reagent|
-		elusive_reagent_cost.keys.include?(reagent) or $alchemy_recipes.any? { |recipe| recipe[:product] == reagent } or (grind_recipe = $alchemy_recipes.find { |recipe| recipe[:steps].first == "grind #{reagent}" } and $alchemy_recipes.any? { |recipe| (recipe[:product] == grind_recipe[:product]) and (recipe[:steps].first !~ /^grind/) })
-	}
-	respond all_reagents
-	exit
-	results = check_recipe.call('dark translucent crystal', 1)
-	show_check.call(results)
-	echo results.inspect
 elsif script.vars[1].downcase == 'auto'
 	if script.vars[2].downcase =~ /^(alchemy|trinkets|potions)$/
 		type_list = [ $1 ]
@@ -2637,16 +2928,16 @@ elsif script.vars[1].downcase == 'auto'
 		if CharSettings['sell-crap']
 			sell.call
 		end
+		if ((silvers = check_silvers.call) > 0) and room_id = where_is.call('bank').first
+			start_script 'go2', [ room_id.to_s ]
+			wait_while { running?('go2') }
+			fput "deposit #{silvers}"
+		end
 		# fixme: not sure what the real limit is..
 		$last_alchemy_buy ||= Time.now - 481
 		if CharSettings['buy-crap'] and (Time.now - $last_alchemy_buy) > 480
 			buy_elusive.call
 			$last_alchemy_buy = Time.now
-		end
-		if ((silvers = check_silvers.call) > 0) and room_id = where_is.call('bank').first
-			start_script 'go2', [ room_id.to_s ]
-			wait_while { running?('go2') }
-			fput "deposit #{silvers}"
 		end
 		sleep 0.5
 	}
@@ -2662,7 +2953,7 @@ elsif script.vars[1].downcase == 'list'
 	output.concat "   hide-jar-check:       #{fix_option[CharSettings['hide-jar-check']]}\n"
 	output.concat "   cast-sanctuary:       #{fix_option[CharSettings['cast-sanctuary']]}\n"
 	output.concat "   buy-crap:             #{fix_option[CharSettings['buy-crap']]}\n"
-	output.concat "   trow-away-crap:       #{fix_option[CharSettings['throw-away-crap']]}\n"
+	output.concat "   throw-away-crap:      #{fix_option[CharSettings['throw-away-crap']]}\n"
 	output.concat "   sell-crap:            #{fix_option[CharSettings['sell-crap']]}\n"
 	output.concat "   attack-script:        #{CharSettings['attack-script']}\n"
 	output.concat "   before-hunt-script:   #{CharSettings['before-hunt-script']}\n"
@@ -2678,70 +2969,114 @@ elsif script.vars[1].downcase == 'list'
 		output.concat "\n"
 	end
 	respond output
+elsif script.vars[1].downcase == 'sell'
+	sell.call
 else
 	output = "\n"
-	output.concat "Setup:\n"
-	output.concat "   #{$clean_lich_char}set change alchemysack <container>\n"
-	output.concat "   #{$clean_lich_char}set change lootsack <container>\n"
-	output.concat "   #{$clean_lich_char}set change herbsack <container>\n"
+	output.concat "setup:\n"
 	output.concat "\n"
-	output.concat "   #{$clean_lich_char}#{script.name} set cost-per-second <#>\n"
-	output.concat "   #{$clean_lich_char}#{script.name} set max-travel-time <#>\n"
-	output.concat "   #{$clean_lich_char}#{script.name} set max-hunt-time <#>\n"
-	output.concat "   #{$clean_lich_char}#{script.name} set hide-gld-check <on|off>\n"
-	output.concat "   #{$clean_lich_char}#{script.name} set hide-bundle-check <on|off>\n"
-	output.concat "   #{$clean_lich_char}#{script.name} set hide-jar-check <on|off>\n"
-	output.concat "   #{$clean_lich_char}#{script.name} set cast-sanctuary <on|off>\n"
-	output.concat "   #{$clean_lich_char}#{script.name} set buy-crap <on|off>\n"
-	output.concat "   #{$clean_lich_char}#{script.name} set throw-away-crap <on|off>\n"
-	output.concat "   #{$clean_lich_char}#{script.name} set sell-crap <on|off>\n"
-	output.concat "   #{$clean_lich_char}#{script.name} set attack-script <scriptname>\n"
-	output.concat "   #{$clean_lich_char}#{script.name} set before-hunt-script <scriptname>\n"
-	output.concat "   #{$clean_lich_char}#{script.name} set after-hunt-script <scriptname>\n"
-	output.concat "   #{$clean_lich_char}#{script.name} set before-forage-script <scriptname>\n"
-	output.concat "   #{$clean_lich_char}#{script.name} set after-forage-script <scriptname>\n"
+	output.concat "   #{$clean_lich_char}#{script.name} set alchemysack <container>      Where to put away reagents and alchemy equipment.\n"
 	output.concat "\n"
-	output.concat "   #{$clean_lich_char}#{script.name} add fav <scriptname>\n"
-	output.concat "   #{$clean_lich_char}#{script.name} del fav <scriptname>\n"
+	output.concat "   #{$clean_lich_char}#{script.name} set lootsack <container>         Where to put away end-products and miscellaneous stuff.\n"
 	output.concat "\n"
-	output.concat "   #{$clean_lich_char}#{script.name} list\n"
+	output.concat "   #{$clean_lich_char}#{script.name} set herbsack <container>         Where to put away herbs.\n"
 	output.concat "\n"
-	output.concat "Usage:\n"
-	output.concat "   #{$clean_lich_char}#{script.name} make <recipe>\n"
+	output.concat "   (the script will look for what it needs in all three of the above containers)\n"
+	output.concat "\n"
+	output.concat "   #{$clean_lich_char}#{script.name} set cost-per-second <#>          Used to convert time into silvers when finding the \n"
+	output.concat "    #{''.rjust(script.name.length) }                                  fastest/cheapest recipe.\n"
+	output.concat "\n"
+	output.concat "   #{$clean_lich_char}#{script.name} set max-travel-time <#>          Places that go2 thinks is more than # of seconds away\n"
+	output.concat "    #{''.rjust(script.name.length) }                                  from your guild will be assumed to not exist.\n"
+	output.concat "\n"
+	output.concat "   #{$clean_lich_char}#{script.name} set max-hunt-time <#>            Give up hunting for reagents after # seconds.\n"
+	output.concat "\n"
+	output.concat "   #{$clean_lich_char}#{script.name} set hide-gld-check <on|off>      Hide spam from the script using the gld verb.\n"
+	output.concat "\n"
+	output.concat "   #{$clean_lich_char}#{script.name} set hide-bundle-check <on|off>   Hide spam from the script measuring bundles.\n"
+	output.concat "\n"
+	output.concat "   #{$clean_lich_char}#{script.name} set hide-jar-check <on|off>      Hide spam from the script measuring jars.\n"
+	output.concat "\n"
+	output.concat "   #{$clean_lich_char}#{script.name} set cast-sanctuary <on|off>      Cast sanctuary before foraging in a room.\n"
+	output.concat "\n"
+	output.concat "   #{$clean_lich_char}#{script.name} set buy-crap <on|off>            Buy things from the alchemist reagent shop (in auto mode).\n"
+	output.concat "\n"
+	output.concat "   #{$clean_lich_char}#{script.name} set throw-away-crap <on|off>     Throw away a pre-defined list (incomplete) of alchemy\n"
+	output.concat "    #{''.rjust(script.name.length) }                                  byproducts that can't be sold (in auto mode).\n"
+	output.concat "\n"
+	output.concat "   #{$clean_lich_char}#{script.name} set sell-crap <on|off>           Sell alchemy products (in auto mode).\n"
+	output.concat "\n"
+	output.concat "   #{$clean_lich_char}#{script.name} set attack-script <scriptname>          A script you provide that will kill and loot the\n"
+	output.concat "    #{''.rjust(script.name.length) }                                         monsters whose ids are passed to it.\n"
+	output.concat "\n"
+	output.concat "   #{$clean_lich_char}#{script.name} set before-hunt-script <scriptname>     A script you provide that will get your hunting\n"
+	output.concat "    #{''.rjust(script.name.length) }                                         gear out (or any other pre-hunt actions)\n"
+	output.concat "\n"
+	output.concat "   #{$clean_lich_char}#{script.name} set after-hunt-script <scriptname>      A script you provide that will put your gear away\n"
+	output.concat "    #{''.rjust(script.name.length) }                                         (or any other post-hunt actions: make sure you\n"
+	output.concat "    #{''.rjust(script.name.length) }                                         don't sell the reagents it just collected)\n"
+	output.concat "\n"
+	output.concat "   #{$clean_lich_char}#{script.name} set before-forage-script <scriptname>   A script you provide that does anything you might\n"
+	output.concat "    #{''.rjust(script.name.length) }                                         need before going to to forage\n"
+	output.concat "\n"
+	output.concat "   #{$clean_lich_char}#{script.name} set after-forage-script <scriptname>    A script you provide that does anything you might\n"
+	output.concat "    #{''.rjust(script.name.length) }                                         need after going to to forage\n"
+	output.concat "\n"
+	output.concat "   #{$clean_lich_char}#{script.name} clear <whatever>-script                 Clears one of the previous script settings\n"
+	output.concat "\n"
+	output.concat "commands:\n"
+	output.concat "\n"
+	output.concat "   #{$clean_lich_char}#{script.name} list                              Show current settings.\n"
+	output.concat "\n"
+	output.concat "   #{$clean_lich_char}#{script.name} make <recipe>                     Follows the given recipe.\n"
 	output.concat "   #{$clean_lich_char}#{script.name} make <recipe> x<repetitions>\n"
 	output.concat "\n"
-	output.concat "   #{$clean_lich_char}#{script.name} prepare <recipe>                  buys, forages, and makes all the requirements, so you\n"
-	output.concat "   #{$clean_lich_char}#{script.name} prepare <recipe> x<repetitions>     can make the recipe later without having to run around\n"
+	output.concat "   #{$clean_lich_char}#{script.name} prepare <recipe>                  Buys, forages, and makes all the requirements, so you\n"
+	output.concat "   #{$clean_lich_char}#{script.name} prepare <recipe> x<repetitions>   can make the recipe later without having to run around.\n"
 	output.concat "\n"
-	output.concat "   #{$clean_lich_char}#{script.name} check <recipe>                    gives the same summary as make, but does nothing\n"
+	output.concat "   #{$clean_lich_char}#{script.name} check <recipe>                    Gives the same summary as make, but does nothing.\n"
 	output.concat "   #{$clean_lich_char}#{script.name} check <recipe> x<repetitions>\n"
 	output.concat "\n"
-	output.concat "   #{$clean_lich_char}#{script.name} suggest                           attempts to list the recipes you'll get ranks for\n"
+	output.concat "   #{$clean_lich_char}#{script.name} suggest                           Attempts to list the recipes you'll get ranks for\n"
+	output.concat "    #{''.rjust(script.name.length) }                                   (and one of many possible reasons you can't use it).\n"
 	output.concat "\n"
-	output.concat "   #{$clean_lich_char}#{script.name} jar                               fills your jars with loose items of the same type\n"
+	output.concat "   #{$clean_lich_char}#{script.name} jar                               Fills jars in your alchemy sack with loose items of\n"
+	output.concat "    #{''.rjust(script.name.length) }                                   the same type.\n"
 	output.concat "\n"
-	output.concat "   #{$clean_lich_char}#{script.name} buy\n"
+	output.concat "   #{$clean_lich_char}#{script.name} buy                               Buys reagents you need from the alchemist reagent shop\n"
+	output.concat "    #{''.rjust(script.name.length) }                                   (up to a max of 20 of each item on you)\n"
 	output.concat "\n"
-	output.concat "   #{$clean_lich_char}#{script.name} need\n"
+	output.concat "   #{$clean_lich_char}#{script.name} need                              Puts the names of all reagents you could use to get reps\n"
+	output.concat "    #{''.rjust(script.name.length) }                                   from into a variable that can be accessed by other scripts\n"
+	output.concat "    #{''.rjust(script.name.length) }                                   (in auto mode, this command is done for you).  loot-be-gone\n"
+	output.concat "    #{''.rjust(script.name.length) }                                   uses this to automatically avoid selling things you need.\n"
 	output.concat "\n"
-	output.concat "   #{$clean_lich_char}#{script.name} task alchemy\n"
-	output.concat "   #{$clean_lich_char}#{script.name} task potions\n"
-	output.concat "   #{$clean_lich_char}#{script.name} task trinkets\n"
+	output.concat "   #{$clean_lich_char}#{script.name} add fav <recipename>              The reagents for the given recipe will be included in the\n"
+	output.concat "    #{''.rjust(script.name.length) }                                   above \"need\" variable even if you can't get reps from it.\n"
 	output.concat "\n"
-	output.concat "   #{$clean_lich_char}#{script.name} task distill\n"
-	output.concat "   #{$clean_lich_char}#{script.name} task assembly\n"
-	output.concat "   #{$clean_lich_char}#{script.name} task grind\n"
-	output.concat "   #{$clean_lich_char}#{script.name} task grind-mine\n"
-	output.concat "   #{$clean_lich_char}#{script.name} task crucible\n"
-	output.concat "   #{$clean_lich_char}#{script.name} task sweep\n"
+	output.concat "   #{$clean_lich_char}#{script.name} del fav <recipename>              Undo the above commanmd.\n"
 	output.concat "\n"
-	output.concat "   #{$clean_lich_char}#{script.name} auto                              gain ranks afk (somewhat buggy)\n"
-	output.concat "   #{$clean_lich_char}#{script.name} auto <alchemy|potions|trinkets>   only work on the given area\n"
+	output.concat "   #{$clean_lich_char}#{script.name} task alchemy                      Attempt to complete one task in general alchemy.\n"
+	output.concat "\n"
+	output.concat "   #{$clean_lich_char}#{script.name} task potions                      Attempt to complete one task in potions.\n"
+	output.concat "\n"
+	output.concat "   #{$clean_lich_char}#{script.name} task trinkets                     Attempt to complete one task in trinkets.\n"
+	output.concat "\n"
+	output.concat "   #{$clean_lich_char}#{script.name} task distill                      Does the \"distill water for the guild's supply\" task.\n"
+	output.concat "\n"
+	output.concat "   #{$clean_lich_char}#{script.name} task assembly                     Does the \"polish tarnished lens assemblies\" task.\n"
+	output.concat "\n"
+	output.concat "   #{$clean_lich_char}#{script.name} task grind                        Does the \"grind some ingredients for the guild's supply\" task.\n"
+	output.concat "\n"
+	output.concat "   #{$clean_lich_char}#{script.name} task grind-mine                   Does the \"grinding various ingredients\" task.\n"
+	output.concat "\n"
+	output.concat "   #{$clean_lich_char}#{script.name} task crucible                     Does the \"clean alchemic equipment\" task.\n"
+	output.concat "\n"
+	output.concat "   #{$clean_lich_char}#{script.name} task sweep                        Does the \"sweep the alchemy labs\" task.\n"
+	output.concat "\n"
+	output.concat "   #{$clean_lich_char}#{script.name} auto                              Attempts to do everything until you master.\n"
+	output.concat "\n"
+	output.concat "   #{$clean_lich_char}#{script.name} auto <alchemy|potions|trinkets>   Only work on the given area(s).\n"
 	output.concat "\n"
 	respond output 
 end
-
-=begin
-	The surface of the solution in the iron cauldron shimmers in response!
-	The diamond lens shatters!
-=end

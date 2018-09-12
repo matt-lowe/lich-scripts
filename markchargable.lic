@@ -3,6 +3,7 @@
 	This script might take gems out of a container, loresing to them for their purpose,
 	mark them as unsellable if they're mage rechargable, and put them back in the container.
 
+	https://github.com/matt-lowe/lich-scripts
 	tillmen@lichproject.org
 
 =end

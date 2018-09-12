@@ -4,7 +4,10 @@
 
 	;trollspeak <say|think|chat|psinet|echo|fam|familiar> <something>
 
-	tillmen@lichproject.org
+	 author: Tillmen (tillmen@lichproject.org)
+	   game: Gemstone
+	   tags: speech
+	version: 0.1
 
 =end
 

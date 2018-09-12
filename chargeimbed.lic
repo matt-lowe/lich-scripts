@@ -7,14 +7,21 @@
 	imbed as you use it, this script updates that tracking as you charge the
 	item (unless it's a common item).
 
-	tillmen@lichproject.org
+	 author: Tillmen (tillmen@lichproject.org)
+	   game: Gemstone
+	   tags: magic
+	version: 0.2
+
+	changelog:
+		2015-07-06 (0.2):
+			pull mana directly from the XML stream to avoid race conditions
 
 =end
 
 added_mana      = 0
 added_charges   = 0
 item_id         = nil
-items           = Hash.new
+$items        ||= Hash.new
 start_mana      = XMLData.mana
 
 common_items = {
@@ -38,6 +45,8 @@ common_items = {
 	'smooth amber wand'                 => 1708,
 	'crystal wand'                      => 1710,
 	'etched crystal wand'               => 1710,
+	'heavy quartz orb'                  => 1711,
+	'small statue'                      => 1712,
 	'scattering of deathstone granules' => 1713,
 	'some fine firestone dust'          => 1715,
 }
@@ -64,13 +73,13 @@ mana_per_charge = proc { |spell_num|
 	[spell_level, (base_cost - (Skills.emc/5))].max
 }
 
-before_dying {
+show_stats = proc {
 	respond
 	respond '--- Charge Session Stats'
 	respond
 	respond 'item name                         charges   mana'
 	respond '-------------------------------   -------   ----'
-	items.each_pair { |item_id,hash|
+	$items.each_pair { |item_id,hash|
 		if hash[:added_charges]
 			respond "#{hash[:name].ljust(31)}   #{hash[:added_charges].to_s.rjust(7)}"
 		else
@@ -80,51 +89,70 @@ before_dying {
 	respond
 }
 
+before_dying {
+	show_stats.call
+}
+
 status_tags
 
 loop {
 	line = get
-	if line =~ /<prompt/
-		start_mana = XMLData.mana
-	elsif line =~ /You gesture over the pulsating orb while holding (?:a |an )?<a exist="([0-9]+)".*?>(.*?)<\/a> near it\./
-		end_mana = XMLData.mana
-		item_id = $1
-		items[item_id] ||= Hash.new
-		items[item_id][:name] ||= $2
+	if line =~ /<.*progressBar id='mana' .*?text='mana (\d+)\/\d+'.*>You gesture over the pulsating orb while holding (?:a |an )?<a exist="([0-9]+)".*?>(.*?)<\/a> near it\./
+		end_mana = $1.to_i
+		item_id = $2
+		$items[item_id] ||= Hash.new
+		$items[item_id][:name] ||= $3
 		# Report the number of charges or mana added
-		if spell_num = common_items[items[item_id][:name]]
+		if spell_num = common_items[$items[item_id][:name]]
 			added_charges = ((start_mana - end_mana)/mana_per_charge[spell_num].to_f).round
 			added_mana = nil
-			items[item_id][:added_charges] = items[item_id][:added_charges].to_i + added_charges
-			respond "[ charges added: #{added_charges}, total added: #{items[item_id][:added_charges]} ]"
-		elsif spell_num = UserVars.imbeds[items[item_id][:name]][:spell]
+			$items[item_id][:added_charges] = $items[item_id][:added_charges].to_i + added_charges
+			sleep 0.1
+			respond "[ charges added: #{added_charges}, total added: #{$items[item_id][:added_charges]} ]"
+		elsif spell_num = UserVars.imbeds[$items[item_id][:name]][:spell]
 			added_charges = ((start_mana - end_mana)/mana_per_charge[spell_num].to_f).round
 			added_mana = nil
-			items[item_id][:added_charges] = items[item_id][:added_charges].to_i + added_charges
-			UserVars.imbeds[items[item_id][:name]][:charges] = UserVars.imbeds[items[item_id][:name]][:charges].to_i + added_charges
-			respond "[ charges added: #{added_charges}, total added: #{items[item_id][:added_charges]} ]"
-			respond "[ #{items[item_id][:name]}: #{UserVars.imbeds[items[item_id][:name]][:charges]} charges remaining. ]"
+			$items[item_id][:added_charges] = $items[item_id][:added_charges].to_i + added_charges
+			UserVars.imbeds[$items[item_id][:name]][:charges] = UserVars.imbeds[$items[item_id][:name]][:charges].to_i + added_charges
+			sleep 0.1
+			respond "[ charges added: #{added_charges}, total added: #{$items[item_id][:added_charges]} ]"
+			respond "[ #{$items[item_id][:name]}: #{UserVars.imbeds[$items[item_id][:name]][:charges]} charges remaining. ]"
 		else
 			added_charges = nil
 			added_mana = start_mana - end_mana
-			items[item_id][:added_mana] = items[item_id][:added_mana].to_i + added_mana
-			respond "[ mana added: #{added_mana}, total added: #{items[item_id][:added_mana]} ]"
+			$items[item_id][:added_mana] = $items[item_id][:added_mana].to_i + added_mana
+			sleep 0.1
+			respond "[ mana added: #{added_mana}, total added: #{$items[item_id][:added_mana]} ]"
 		end
-	elsif line =~ /^You feel terribly drained\!/
-		# incorrectly figured the lost mana as charges added, undo that
-		respond "[ thats not right... ]"
-		if items[item_id][:added_charges]
-			items[item_id][:added_charges] -= added_charges
-			if UserVars.imbeds[items[item_id][:name]]
-				UserVars.imbeds[items[item_id][:name]][:charges] =- added_charges
-				respond "[ #{items[item_id][:name]}: #{UserVars.imbeds[items[item_id][:name]][:charges]} charges remaining. ]"
+		start_mana = end_mana
+	else
+		if line =~ /<.*progressBar id='mana' .*?text='mana (\d+)\/\d+'.*>/
+			start_mana = $1.to_i
+		end
+		if line =~ /^You feel terribly drained\!/
+			# incorrectly figured the lost mana as charges added, undo that
+			respond "[ thats not right... ]"
+			if $items[item_id][:added_charges]
+				$items[item_id][:added_charges] -= added_charges
+				if UserVars.imbeds[$items[item_id][:name]]
+					UserVars.imbeds[$items[item_id][:name]][:charges] =- added_charges
+					sleep 0.1
+					respond "[ #{$items[item_id][:name]}: #{UserVars.imbeds[$items[item_id][:name]][:charges]} charges remaining. ]"
+				else
+					sleep 0.1
+				end
+				respond "[ charges added: 0, total added: #{$items[item_id][:added_charges]} ]"
+			else
+				$items[item_id][:added_mana] -= added_mana
+				sleep 0.1
+				respond "[ mana added: 0, total added: #{$items[item_id][:added_mana]} ]"
 			end
-			respond "[ charges added: 0, total added: #{items[item_id][:added_charges]} ]"
-		else
-			items[item_id][:added_mana] -= added_mana
-			respond "[ mana added: 0, total added: #{items[item_id][:added_mana]} ]"
+		elsif line =~ /^The pulsating orb (?:quickly|suddenly) implodes/
+			show_stats.call
+#			break
+		elsif line =~ /expands into a blue pulsating orb!/
+			minutes = 0
+			Thread.new { loop { sleep 60; minutes += 1; echo "orb is #{minutes} minutes old" } }
 		end
-	elsif line =~ /^The pulsating orb (?:quickly|suddenly) implodes/
-		break
 	end
 }

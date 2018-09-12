@@ -6,7 +6,10 @@
 
 	;shield-size help
 
-	tillmen@lichproject.org
+	 author: Tillmen (tillmen@lichproject.org)
+	   game: Gemstone
+	   tags: data
+	version: 0.1
 
 =end
 

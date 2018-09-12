@@ -19,7 +19,9 @@
 
 	;zombie help
 
-	tillmen@lichproject.org
+	author: Tillmen (tillmen@lichproject.org)
+	game: Gemstone
+	tags: death
 
 =end
 
@@ -59,6 +61,36 @@ priestess_wander_boundaries.concat ['14032', '5906', '10379', '17215', '10382', 
 bank_list.push 10325
 
 CharSettings['minimum-deeds'] ||= 2
+
+start_rooms = [ 285 ]
+
+wander_history = Array.new
+
+find_priestess_2 = proc {
+	until checknpcs.include?('priestess') or dead?
+		room = Room.current
+		next_room_options = room.wayto.keys.find_all { |k| room.wayto[k] =~ /^(?:north|northeast|east|southeast|south|southwest|west|northwest|out|n|ne|e|se|s|sw|w|nw)$/ }
+		next_room = next_room_options.find_all { |r| not wander_history.include?(r) }
+		if next_room.empty?
+			next_room = wander_history.find { |r| next_room_options.include?(r) }
+		else
+			next_room = next_room[rand(next_room.length)]
+		end
+		if next_room
+			wander_history.delete(next_room)
+			wander_history.push(next_room)
+			way = Room.current.wayto[next_room]
+			if way.class == String 
+				move way
+			elsif way.class == Proc
+				way.call
+			end
+		else
+			echo 'fixme'
+			exit
+		end
+	end
+}
 
 find_priestess = proc {
 	visited_rooms = Array.new
@@ -160,7 +192,7 @@ remove_sting = proc {
 		end
 		empty_hands
 		until (deaths_sting == 'None') or dead?
-			find_priestess.call
+			find_priestess_2.call
 			result = dothistimeout "give ##{GameObj.npcs.find { |npc| npc.noun == 'priestess' }.id} #{potion_cost} silvers", 5, /^What is it you're trying to give\?$|^You start to hand the priestess [0-9]+ silvers, but she only takes|^You count your coins and realize that you don't have that much money!$|^You hand the priestess/
 			if result == "You count your coins and realize that you don't have that much money!"
 				break if out_of_silvers

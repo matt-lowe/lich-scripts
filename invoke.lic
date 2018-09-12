@@ -4,8 +4,9 @@
 
 	It will empty your hands if needed.
 	If a target is provided, it will cast at the target.  If not, it will leave the spell prepared.
-	Lich.scrollsack should be set (;set change scrollsack <container name>)
+	UserVars.scrollsack should be set (;set change scrollsack <container name>)
 
+	https://github.com/matt-lowe/lich-scripts
 	tillmen@lichproject.org
 
 =end
@@ -14,7 +15,7 @@ unless defined?(dothis)
 	echo 'Your version of Lich is too old for this script.'
 	exit
 end
-if Lich.scrollsack.nil? or Lich.scrollsack.empty?
+if UserVars.scrollsack.nil? or UserVars.scrollsack.empty?
 	echo 'You need to set your scrollsack.  ;setting change scrollsack <container>'
 	exit
 end
@@ -34,7 +35,7 @@ end
 
 return_scroll = proc {
 	if checkleft =~ /(scroll|paper|papyrus|vellum|palimpsest|parchment)/ || checkright =~ /(scroll|paper|papyrus|vellum|palimpsest|parchment)/
-		put 'put my ' + $1 + ' in my ' + Lich.scrollsack
+		put 'put my ' + $1 + ' in my ' + UserVars.scrollsack
 	end
 }
 
@@ -45,11 +46,11 @@ empty_hands
 #
 close_scrollsack = false
 loop {
-	rummage_result = dothis "rummage in my #{Lich.scrollsack} for spell #{spell}", /^What spell are you looking for\?$|^What were you wanting to rummage through\?$|^You'll have to open|^(In the .+)?You rummage/
+	rummage_result = dothis "rummage in my #{UserVars.scrollsack} for spell #{spell}", /^What spell are you looking for\?$|^What were you wanting to rummage through\?$|^You'll have to open|^(In the .+)?You rummage/
 	if rummage_result =~ /and remove/
 		break
 	elsif rummage_result =~ /^You'll have to open/
-		dothis "open my #{Lich.scrollsack}", /^You open/
+		dothis "open my #{UserVars.scrollsack}", /^You open/
 		close_scrollsack = true
 		next
 	else
@@ -87,5 +88,5 @@ fill_hands
 # close the scrollsack if it was opened
 #
 if close_scrollsack
-	dothis "close my #{Lich.scrollsack}", /^(In the.+)?You close/
+	dothis "close my #{UserVars.scrollsack}", /^(In the.+)?You close/
 end

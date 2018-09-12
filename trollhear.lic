@@ -6,7 +6,10 @@
 	Start the script with some trollspeak to translate it.
 	Start the script with no variables and it will attempt to find and translate any trollspeak that shows up in the game.
 
-	tillmen@lichproject.org
+	 author: Tillmen (tillmen@lichproject.org)
+	   game: Gemstone
+	   tags: speech
+	version: 0.1
 
 =end
 
@@ -101,6 +104,8 @@ loop {
 	if line =~ /\[(General|LNet|Merchant|Guild|House|Shattered)\]/
 		if $frontend == 'stormfront'
 			puts '<pushStream id="thoughts"/>[trollhear: ' + to_common(troll) + ']<popStream/>'
+		elsif $frontend == 'profanity'
+			_respond '<pushStream id="thoughts"/>[trollhear: ' + to_common(troll) + ']<popStream/>'
 		else
 			respond "You hear the faint thoughts of [trollhear echo in your mind:\n" + to_common(troll) + "]"
 		end

@@ -4,6 +4,7 @@
 
 	Open the script and comment/uncomment some lines to pick your signs.
 
+	https://github.com/matt-lowe/lich-scripts
 	tillmen@lichproject.org
 
 =end
@@ -15,16 +16,27 @@ clear
 
 sign_list = Array.new
 
-sign_list.push 'Warding'
-sign_list.push 'Striking'
-# sign_list.push 'Thought'
-sign_list.push 'Defending'
-sign_list.push 'Smiting'
-sign_list.push 'Staunching'
-sign_list.push 'Deflection'
-sign_list.push 'Swords'
-sign_list.push 'Shields'
-sign_list.push 'Dissipation'
+if script.vars[1] == 'conf'
+	echo 'confluence'
+	sign_list.push 'Warding'
+	sign_list.push 'Defending'
+	sign_list.push 'Striking'
+	sign_list.push 'Smiting'
+	sign_list.push 'Swords'
+	sign_list.push 'Staunching'
+	sign_list.push 'Dissipation'
+else
+	sign_list.push 'Warding'
+	sign_list.push 'Striking'
+	# sign_list.push 'Thought'
+	sign_list.push 'Defending'
+	sign_list.push 'Smiting'
+	sign_list.push 'Staunching'
+	sign_list.push 'Deflection'
+	sign_list.push 'Swords'
+	#sign_list.push 'Shields'
+	sign_list.push 'Dissipation'
+end
 
 sign_list.delete_if { |sign| !Spell[sign].known? }
 

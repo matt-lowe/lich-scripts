@@ -1,22 +1,30 @@
 =begin
 
 	Simple script to change these game lines:
+
 		Roundtime: # sec.
 		Roundtime changed to # seconds.
+
 	into this line:
+
 		Roundtime: # sec.  (originally # sec.) 
 
-	tillmen@lichproject.org
+
+	 author: Tillmen (tillmen@lichproject.org
+	   game: Gemstone
+	   tags: cosmetic
+	version: 0.1
 
 =end
 
 script.hidden = true
-before_dying { DownstreamHook.remove('short_haste_message') }
 
 rt_string = nil
 orig_rt = nil
 hook_proc = proc { |server_string|
-	if rt_string.nil?
+	if server_string =~ /^Cast Roundtime 3 Seconds\.\r?\n?$|^\[Spell Hindrance|^<a exist="spell" noun="spell">Your spell is ready\.<\/a>/
+		nil
+	elsif rt_string.nil?
 		if (server_string =~ /^(?:<.+>)?Roundtime\: ([0-9]+) sec\./) and (XMLData.active_spells['Haste'] or XMLData.active_spells['506'])
 			orig_rt = $1
 			rt_string = server_string
@@ -35,6 +43,10 @@ hook_proc = proc { |server_string|
 		new_server_string
 	end
 }
-DownstreamHook.add('short_haste_message', hook_proc)
 
-loop { sleep 1 }
+begin
+	DownstreamHook.add('short_haste_message', hook_proc)
+	loop { sleep 1 }
+ensure
+	DownstreamHook.remove('short_haste_message')
+end

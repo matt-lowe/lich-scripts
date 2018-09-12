@@ -22,26 +22,23 @@
 
 	;ego2 help
 
-	https://github.com/matt-lowe/lich-scripts
-	https://www.gittip.com/matt-lowe
-	matt@lichproject.org
+	 author: Tillmen (tillmen@lichproject.org)
+	   game: Gemstone
+	   tags: bounty
+	version: 0.5
+
+	changelog:
+		0.5 (2015-04-07):
+			ignore disabled people's disabled bandits
+			don't use "a tiny shard of jet black crystal" as an indicator of who owns the bandits
+			pay attention to disks
+		0.4 (2014-11-04):
+			fixed poaching issue where escort id wasn't being checked when he exclaims, "It's an ambush!"
+		0.3 (2014-09-29):
+			reworked ambush detection to prevent false positives (poaching other peoples bandits)
+			removed code to download gameobj-data.xml
 
 =end
-
-if defined?(GameObj.type_data)
-	GameObj.load_data if GameObj.type_data.empty? or GameObj.type_data.nil?
-	if GameObj.type_data.nil?
-		wait_while { running?('updater') }
-		wait_while { running?('repository') }
-		start_script 'repository', [ 'download', 'gameobj-data.xml' ]
-		wait_while { running?('repository') }
-		wait_while { running?('updater') }
-		start_script 'updater', [ 'add', 'gameobj-data.xml' ]
-		wait_while { running?('updater') }
-		GameObj.load_data
-		exit if GameObj.type_data.nil?
-	end
-end
 
 fix_setting = { 'on' => true, 'off' => false, 'true' => true, 'false' => false, 'yes' => true, 'no' => false }
 
@@ -94,6 +91,7 @@ justice_count = 0
 fell_off_rope = false
 lost_escort   = 0
 sanct_count   = -1
+wait_num      = 45
 
 options = script.vars.find_all { |var| var =~ /^\-\-/ }
 script.vars.delete_if { |var| var =~ /^\-\-/ }
@@ -155,7 +153,6 @@ CharSettings['untargetable'] ||= Array.new
 destination_room  = nil
 path              = nil
 escort_id         = nil
-my_ambush         = false
 ambush_room_count = XMLData.room_count
 no_hide_rooms     = [ 1192, 1191, 1190, 1156, 1155, 1154, 1153 ]
 no_haste_rooms    = [ 1191 ]
@@ -187,7 +184,7 @@ escort_dropoff = {
 
 $ego2_travel_cost ||= {
 	"Wehnimer's Landing" => {
-		"Icemule Trace"      => 5,
+		"Icemule Trace"      => 0,
 		"Zul Logoth"         => 20,
 		"Solhaven"           => 0,
 		"Ta'Vaalor"          => 4020,
@@ -202,28 +199,28 @@ $ego2_travel_cost ||= {
 	},
 	"Zul Logoth" => {
 		"Wehnimer's Landing" => 2020,
-		"Icemule Trace"      => 2025,
+		"Icemule Trace"      => 2020,
 		"Solhaven"           => 2020,
 		"Ta'Vaalor"          => 2000,
 		"Ta'Illistim"        => 2000,
 	},
 	"Solhaven" => {
 		"Wehnimer's Landing" => 0,
-		"Icemule Trace"      => 5,
+		"Icemule Trace"      => 0,
 		"Zul Logoth"         => 20,
 		"Ta'Vaalor"          => 4020,
 		"Ta'Illistim"        => 4020,
 	},
 	"Ta'Vaalor" => {
 		"Wehnimer's Landing" => 4020,
-		"Icemule Trace"      => 4025,
+		"Icemule Trace"      => 4020,
 		"Zul Logoth"         => 2000,
 		"Solhaven"           => 4020,
 		"Ta'Illistim"        => 0,
 	},
 	"Ta'Illistim" => {
 		"Wehnimer's Landing" => 4020,
-		"Icemule Trace"      => 4025,
+		"Icemule Trace"      => 4020,
 		"Zul Logoth"         => 2000,
 		"Solhaven"           => 4020,
 		"Ta'Vaalor"          => 0,
@@ -284,25 +281,30 @@ check_escort = proc {
 	GameObj.npcs.any? { |npc| npc.id == escort_id }
 }
 
-check_ambush = proc {
-	if my_ambush and (ambush_room_count == XMLData.room_count)
-		true
-	elsif check_escort.call
-		ambush_room_count = XMLData.room_count
-		my_ambush = true
-	else
-		last_line = $_SERVERBUFFER_.reverse.find { |line| line =~ /<pushStream id='room'\/>|An? .*? fearfully exclaims, "It's an ambush!"|carefully concealed metal jaws|nearly invisible length of razor wire|carefully concealed inflated pouch|tiny shard of jet black crystal|carefully concealed looped rope|a carefully concealed net/ }
-		if last_line.nil?
-			my_ambush
-		elsif last_line =~ /<pushStream id='room'\/>/
-			my_ambush = false
-		else
-			# echo 'my ambush'
-			ambush_room_count = XMLData.room_count
-			my_ambush = true
+$ego2_my_ambush = false
+$ego2_staggered_ambush = false
+exec_string = "
+	hide_me
+	status_tags
+	before_dying { kill_script(#{script.name.inspect}) if running?(#{script.name.inspect}) }
+	Thread.new { wait_while { running?(#{Script.self.name.inspect}) }; Script.self.kill }
+	while (line = get)
+		if line =~ /<pushStream id='room'/
+			$ego2_my_ambush = false
+			$ego2_staggered_ambush = false
+			echo 'not my ambush' if $ego2_debug
+		elsif line =~ /An? .*?\#{$ego2_escort_id}.*? fearfully exclaims, \"It's an ambush!\"|<compass>.*?(?:quickly approaches|suddenly leaps from|leaps out of|suddenly jumps out of the shadows)|carefully concealed metal jaws|nearly invisible length of razor wire|length of nearly invisible razor wire|carefully concealed inflated pouch|carefully concealed looped rope|a carefully concealed net|carefully concealed pit|Suddenly, the ground gives out from under you as you fall into a shallow pit filled with tiny spikes!/
+			# removed cause it caused a poach: tiny shard of jet black crystal
+			$ego2_my_ambush = true
+			echo 'my ambush' if $ego2_debug
+			if line =~ /<compass>.*?(?:quickly approaches|suddenly leaps from|leaps out of|suddenly jumps out of the shadows)/
+				$ego2_staggered_ambush = true
+				echo 'staggered ambush' if $ego2_debug
+			end
 		end
 	end
-}
+"
+start_exec_script(exec_string, flags={ :quiet => true })
 
 check_room = proc {
 	if hide
@@ -310,15 +312,17 @@ check_room = proc {
 	end
 	loop {
 		while unknown_npc = GameObj.npcs.find { |npc| not CharSettings['targetable'].include?(npc.name) and not CharSettings['untargetable'].include?(npc.name) }
-			target_result = dothistimeout "target ##{unknown_npc.id}", 10, /^You are now targeting|^You can't target/
+			target_result = dothistimeout "target ##{unknown_npc.id}", 10, /^You are now targeting|^You can't target|^Usage:  TARGET/
 			if target_result =~ /^You are now targeting/
 				CharSettings['targetable'].push(unknown_npc.name)
 			elsif target_result =~ /^You can't target/
 				CharSettings['untargetable'].push(unknown_npc.name)
 			end
 		end
-		npcs = GameObj.npcs.to_a.find_all { |npc| CharSettings['targetable'].include?(npc.name) and not (npc.name =~ ignorable_npcs) and (npc.noun !~ escort_noun) and (npc.type =~ /bandit/ or npc.status !~ disabled) and (npc.status !~ /dead/) }
-		pcs = GameObj.pcs.to_a.find_all { |pc| pc.status.nil? }
+		npcs = GameObj.npcs.to_a.find_all { |npc| CharSettings['targetable'].include?(npc.name) and not (npc.name =~ ignorable_npcs) and (npc.noun !~ escort_noun) and (($ego2_my_ambush and npc.type =~ /bandit/) or npc.status !~ disabled) and (npc.status !~ /dead/) }
+		all_pcs = GameObj.pcs.to_a
+		pcs = all_pcs.find_all { |pc| pc.status.nil? or pc.status =~ /hiding|hidden/ }
+		disks = GameObj.loot.to_a.find_all { |loot| (loot.noun == 'disk') and (loot.name !~ /#{Char.name}/) and (all_pcs.empty? or (loot.name !~ /#{all_pcs.collect { |pc| pc.noun }.join('|')}/)) }
 		jerks = GameObj.pcs.to_a.find_all { |pc| UserVars.attacked_me.to_a.include?(pc.noun) and (pc.status !~ /dead/) }
 		unless jerks.empty?
 			unless justice_count == XMLData.room_count
@@ -335,7 +339,7 @@ check_room = proc {
 			end
 		end
 		break if sanct_count == XMLData.room_count
-		if (poach and npcs.length > 0) or (npcs.length > 0 and (check_ambush.call or pcs.empty?)) or (attack_script and jerks.length > 0)
+		if (poach and npcs.length > 0) or (npcs.length > 0 and ($ego2_my_ambush or (pcs.empty? and disks.empty?))) or (attack_script and jerks.length > 0)
 			if attack_script
 				if (checkrt > 0)
 					waitrt?
@@ -362,11 +366,21 @@ check_room = proc {
 
 use_herbs = proc {
 	if useherbs
-		if ([Wounds.head, Wounds.neck, Wounds.torso, Wounds.limbs, Wounds.nerves, Scars.head, Scars.neck, Scars.torso, Scars.limbs, Scars.nerves].max > 0) or ((checkhealth + 50) < maxhealth)
-			start_script 'useherbs', [ '--buy-missing=off' ]
-			wait_while { running?('useherbs') }
+		if XMLData.name == 'Tillmen' and XMLData.game == 'GSIV'
+			if ([Wounds.head, Wounds.neck, Wounds.torso, Wounds.limbs, Wounds.nerves, Scars.head, Scars.neck, Scars.torso, Scars.nerves].max > 0) or (Scars.limbs > 1) or ((checkhealth + 50) < maxhealth)
+				start_script 'useherbs', [ '--buy-missing=off' ]
+				wait_while { running?('useherbs') }
+				if ([Wounds.head, Wounds.neck, Wounds.torso, Wounds.limbs, Wounds.nerves, Scars.head, Scars.neck, Scars.torso, Scars.nerves].max > 0) or (Scars.limbs > 1) or ((checkhealth + 50) < maxhealth)
+					useherbs = false
+				end
+			end
+		else
 			if ([Wounds.head, Wounds.neck, Wounds.torso, Wounds.limbs, Wounds.nerves, Scars.head, Scars.neck, Scars.torso, Scars.limbs, Scars.nerves].max > 0) or ((checkhealth + 50) < maxhealth)
-				useherbs = false
+				start_script 'useherbs', [ '--buy-missing=off' ]
+				wait_while { running?('useherbs') }
+				if ([Wounds.head, Wounds.neck, Wounds.torso, Wounds.limbs, Wounds.nerves, Scars.head, Scars.neck, Scars.torso, Scars.limbs, Scars.nerves].max > 0) or ((checkhealth + 50) < maxhealth)
+					useherbs = false
+				end
 			end
 		end
 	end
@@ -1706,7 +1720,7 @@ unless escort_id
 	#
 	start_script 'go2', [ pickup_room.to_s ]
 	wait_while { running?('go2') }
-	dothistimeout 'wait', 10, /^Time drags on by\.\.\.$/
+	dothistimeout 'wait', 20, /^Time drags on by\.\.\.$/
 	checked_npc_ids = Array.new
 	130.times {
 		sleep 0.1
@@ -1716,6 +1730,8 @@ unless escort_id
 			result =  dothistimeout "tell ##{npc.id} to follow", 8, /#{npc.noun} nods and says to you|#{npc.noun} says to you, "But I already am!"|#{npc.noun} says to you, "The guild didn't hire you to guide me\."|^The merchant gives you a strange look\.$/
 			if result =~ /#{npc.noun} nods and says to you|#{npc.noun} says to you, "But I already am!"/
 				escort_id = npc.id
+				before_dying { $ego2_escort_id = nil }
+				$ego2_escort_id = escort_id
 				break
 			end
 		end
@@ -1748,6 +1764,10 @@ start_time = Time.now
 loop {
 
 	haste_me.call
+
+	check_room.call
+
+	use_herbs.call
 
 	check_room.call
 
@@ -1814,25 +1834,18 @@ fput 'unhide' if hidden?
 
 =begin
 
-	You spy a set of carefully concealed metal jaws just as you are about to step on them!
-	Suddenly, you hear a loud *clink* as a large pair of carefully concealed metal jaws slam shut on your left leg!
-
-	You spy a nearly invisible length of razor wire just moments before you are about to step into it!
-	Suddenly, you feel an intense pain in your  right leg! as you realize that you've stumbled right into a length of nearly invisible razor wire!
-
-	You spy a carefully concealed inflated pouch on the path just ahead of you!
-
-	Suddenly, the ground gives out from under you as you fall into a shallow pit filled with tiny spikes!
-
-	Suddenly, a tiny shard of jet black crystal flies from the shadows toward you!
 	You manage to avoid being hit by the crystal as it shatters harmlessly nearby!
 
-	You spy a carefully concealed looped rope on the path just ahead of you!
-	Suddenly, a carefully concealed looped rope springs up from the ground, wrapping around your ankle and tossing you up into the air!
-
-	You spy a carefully concealed net on the path just ahead of you!
-	Suddenly, a carefully concealed net springs up from the ground, completely entangling you!
-
 	You finally reach the shore and you pull yourself to safety.  Your body aches all over and you can't seem to move again just yet.
+
+	A giantman traveller looks faint.
+	A giantman traveller mumbles, "I'm bleeding."
+	A half-elven rogue turns to a giantman traveller and exclaims, "I've got ya now!"
+	A half-elven rogue swings a backsword at a giantman traveller!
+	AS: +414 vs DS: +204 with AvD: +38 + d100 roll: +49 = +297
+	... and hits for 117 points of damage!
+	The giantman traveller twists away but is caught with a hard slash!
+	The giantman traveller is knocked to the ground!
+	The giantman traveller is stunned!
 
 =end

@@ -2,6 +2,7 @@
 
 	This script reads every scroll in your scrollsack and displays a list of all the spells, and how many times they appear.
 
+	https://github.com/matt-lowe/lich-scripts
 	tillmen@lichproject.org
 
 =end
@@ -11,20 +12,20 @@ unless defined?(GameObj)
 	exit
 end
 
-unless Lich.scrollsack
+unless UserVars.scrollsack
 	echo 'scrollsack is not set.  Use ;setting change scrollsack <container>'
 	exit
 end
 
 status_tags
 
-scrollsack = GameObj.inv.find { |obj| obj.name =~ /#{Lich.scrollsack}/ }
+scrollsack = GameObj.inv.find { |obj| obj.name =~ /#{UserVars.scrollsack}/ }
 if scrollsack.nil?
-	scrollsack = GameObj.inv.find { |obj| obj.name =~ /#{Lich.scrollsack.gsub(/\s+/, '.*')}/ }
+	scrollsack = GameObj.inv.find { |obj| obj.name =~ /#{UserVars.scrollsack.gsub(/\s+/, '.*')}/ }
 	echo scrollsack
 end
 if scrollsack.nil?
-	echo "failed to find scrollsack (#{Lich.scrollsack}) in your inventory"
+	echo "failed to find scrollsack (#{UserVars.scrollsack}) in your inventory"
 	exit
 end
 if scrollsack.contents.nil? or scrollsack.contents.empty?
@@ -73,7 +74,7 @@ respond
 
 exit
 
-look_result = dothis 'look in my ' + Lich.scrollsack, /^In the(?:.*?In the)? <a[^>]+>[\w\s]+<\/a> you see/
+look_result = dothis 'look in my ' + UserVars.scrollsack, /^In the(?:.*?In the)? <a[^>]+>[\w\s]+<\/a> you see/
 look_result = look_result.split(/(<a[^>]+>)/)
 scroll_list = Array.new
 for link in look_result

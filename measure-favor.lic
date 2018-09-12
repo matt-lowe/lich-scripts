@@ -4,6 +4,7 @@
 
 	Intened for use near Wehnimer's landing.  You won't have any favor when the script finishes.
 
+	https://github.com/matt-lowe/lich-scripts
 	tillmen@lichproject.org
 
 =end
@@ -103,7 +104,7 @@ get_favor = proc {
 				# fixme
 			end
 		end
-		death_count = GameObj.npcs.find_all { |npc| npc.noun == 'wraith' and npc.status =~ /dead/ }
+		death_count = GameObj.npcs.find_all { |npc| npc.noun == 'wraith' and npc.status =~ /dead/ }.length
 		if death_count > 0
 			if running?('loot')
 				10.times { break unless GameObj.npcs.any? { |npc| npc.status == 'dead' }; sleep 0.2 }
