@@ -7,20 +7,22 @@
 	  author: Tillmen (tillmen@lichproject.org)
 	    game: Gemstone
 	    tags: alchemy, guild
-	 version: 0.14
+	 version: 0.15
 	required: alchemy-recipes.lic >= 0.3
 
 	changelog:
+      0.15 (2018-09-15):
+         fix collecting water
 		0.14 (2017-11-11):
 			fix squelching of gld verb for inactive members
 		0.13 (2017-01-14):
 			make grind task work with "set sortedview on"
-		0.12 (2015-07-08):
-			added support for more scripted containers
 
 =end
 =begin
 
+		0.12 (2015-07-08):
+			added support for more scripted containers
 		0.11 (2015-07-08):
 			fix a bug where the wrong version of a recipe might be used when a specific step is required
 		0.10 (2015-04-27):
@@ -1649,9 +1651,9 @@ do_steps = proc { |steps|
 					return_room = Room.current
 					start_script 'go2', [ room_id.to_s ]
 					wait_while { running?('go2') }
-					dothis "collect water with ##{flask.id}", /under water until it is filled|is already filled/
+					dothis "harvest water with ##{flask.id}", /under water until it is filled|is already filled/
 					dothis "get ##{vial.id}", get_regex
-					dothis "collect water with ##{vial.id}", /under water until it is filled|is already filled/
+					dothis "harvest water with ##{vial.id}", /under water until it is filled|is already filled/
 					start_script 'go2', [ return_room.id.to_s ]
 					wait_while { running?('go2') }
 				else
