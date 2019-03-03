@@ -11,19 +11,21 @@
 	    game: Gemstone
 	    tags: magic
 	required: Lich >= 4.4.6
-	 version: 0.12
+	 version: 0.13
 
 	changelog:
+      0.13 (2019-03-03):
+         set refreshable_min value from CLI if present (sandersch)
 		0.12 (2018-04-20):
          fix --refreshable-min command line option
 		0.11 (2015-11-25):
 			fix max_multicast formula for bards
-		0.10 (2015-06-08):
-			fix multicast duration tracking (the cast every spell once and exit bug)
 
 =end
 =begin
 
+		0.10 (2015-06-08):
+			fix multicast duration tracking (the cast every spell once and exit bug)
 		0.9 (2015-05-20):
 			add option to skip short duration spells on others
 			add option to use symbol of mana (Drafix)
