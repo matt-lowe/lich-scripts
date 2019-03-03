@@ -82,7 +82,7 @@ if setting = script.vars.find { |var| var =~ /^\-\-stop[_\-]before=[0-9]+$/ }
 	script.vars.delete(setting)
 end
 if setting = script.vars.find { |var| var =~ /^\-\-(?:unstackable|refreshable)[_\-]min=[0-9]+$/ }
-	unstackable_min = setting.slice(/[0-9]+/).to_i
+	refreshable_min = setting.slice(/[0-9]+/).to_i
 	script.vars.delete(setting)
 end
 if setting = script.vars.find { |var| var =~ /^\-\-cast[_\-]list=[0-9,]+$/ }
