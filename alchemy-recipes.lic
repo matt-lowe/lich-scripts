@@ -1375,7 +1375,7 @@ $alchemy_recipes = [
 	r = {
 		# fixme: unknown rank
 		:product => 'gorveneh potion',
-		:steps   => [ 'light', 'add flask of clear water', 'add ayana leaf', 'add some essence of water', 'add some coarse glittering earth', 'simmer', 'add some powdered smoky topaz', 'add some essence of earth', 'add some faintly glowing dust', 'boil', 'add some powdered uncut diamond', 'infuse', 'add an essence of greater earth', 'chant 925', 'seal' ],
+		:steps   => [ 'light', 'add flask of clear water', 'add ayana leaf', 'add some essence of water', 'add some coarse glittering earth', 'simmer', 'add some powdered smoky topaz', 'add some essence of earth', 'add some faintly glowing dust', 'boil', 'add some powdered uncut diamond', 'infuse', 'add essence of greater earth', 'chant 925', 'seal' ],
 		:type    => 'potions',
 		:spell   => '925',
 		:rank    => [ 63, 63 ], # fixme: unknown start rank
@@ -1384,7 +1384,7 @@ $alchemy_recipes = [
 	r = {
 		# fixme: unknown rank
 		:product => 'draveneh potion',
-		:steps   => [ 'light', 'add flask of clear water', 'add ayana leaf', 'add some essence of water', 'add pinch of gold dust', 'simmer', 'add some powdered citrine quartz', 'add some essence of fire', 'add some faintly glowing dust', 'boil', 'add some powdered uncut diamond', 'infuse', 'add an essence of greater fire', 'chant 925', 'seal' ],
+		:steps   => [ 'light', 'add flask of clear water', 'add ayana leaf', 'add some essence of water', 'add pinch of gold dust', 'simmer', 'add some powdered citrine quartz', 'add some essence of fire', 'add some faintly glowing dust', 'boil', 'add some powdered uncut diamond', 'infuse', 'add essence of greater fire', 'chant 925', 'seal' ],
 		:type    => 'potions',
 		:spell   => '925',
 		:rank    => [ 63, 63 ], # fixme: unknown start rank
@@ -1393,7 +1393,7 @@ $alchemy_recipes = [
 	r = {
 		# fixme: unknown rank
 		:product => 'rhiveneh potion',
-		:steps   => [ 'light', 'add flask of clear water', 'add ayana leaf', 'add some essence of water', 'add pinch of mithril dust', 'simmer', 'add some powdered blue coral', 'add some essence of water', 'add some faintly glowing dust', 'boil', 'add some powdered uncut diamond', 'infuse', 'add an essence of greater water', 'chant 925', 'seal' ],
+		:steps   => [ 'light', 'add flask of clear water', 'add ayana leaf', 'add some essence of water', 'add pinch of mithril dust', 'simmer', 'add some powdered blue coral', 'add some essence of water', 'add some faintly glowing dust', 'boil', 'add some powdered uncut diamond', 'infuse', 'add essence of greater water', 'chant 925', 'seal' ],
 		:type    => 'potions',
 		:spell   => '925',
 		:rank    => [ 63, 63 ], # fixme: unknown start rank
