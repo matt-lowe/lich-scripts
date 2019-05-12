@@ -39,7 +39,6 @@
 
 =end
 
-# todo: crimson salt crystals recipe maybe
 # thirdly ground lichen doesn't decipher between what kinda lichen. there's at least 2 different lichent hat become ground lichen."  (04:07:13)
 # you need to use alchemy examine to determine what it was before..."  (04:07:24)
 
@@ -1364,7 +1363,42 @@ $alchemy_recipes = [
 		:type    => 'potions',
 		:for     => [ 'Cleric' ],
 	},
-
+	r = {
+		# fixme: unknown rank
+		:product => 'zorveneh potion',
+		:steps   => [ 'light', 'add flask of clear water', 'add ayana leaf', 'add some essence of water', 'add some dark glittering powder', 'simmer', 'add some powdered blue sapphire', 'add some essence of air', 'add some faintly glowing dust', 'boil', 'add some powdered uncut diamond', 'infuse', 'add essence of greater air', 'chant 925', 'seal' ],
+		:type    => 'potions',
+		:spell   => '925',
+		:rank    => [ 63, 63 ], # fixme: unknown start rank
+		:for     => [ 'Wizard' ],
+	},
+	r = {
+		# fixme: unknown rank
+		:product => 'gorveneh potion',
+		:steps   => [ 'light', 'add flask of clear water', 'add ayana leaf', 'add some essence of water', 'add some coarse glittering earth', 'simmer', 'add some powdered smoky topaz', 'add some essence of earth', 'add some faintly glowing dust', 'boil', 'add some powdered uncut diamond', 'infuse', 'add essence of greater earth', 'chant 925', 'seal' ],
+		:type    => 'potions',
+		:spell   => '925',
+		:rank    => [ 63, 63 ], # fixme: unknown start rank
+		:for     => [ 'Wizard' ],
+	},
+	r = {
+		# fixme: unknown rank
+		:product => 'draveneh potion',
+		:steps   => [ 'light', 'add flask of clear water', 'add ayana leaf', 'add some essence of water', 'add pinch of gold dust', 'simmer', 'add some powdered citrine quartz', 'add some essence of fire', 'add some faintly glowing dust', 'boil', 'add some powdered uncut diamond', 'infuse', 'add essence of greater fire', 'chant 925', 'seal' ],
+		:type    => 'potions',
+		:spell   => '925',
+		:rank    => [ 63, 63 ], # fixme: unknown start rank
+		:for     => [ 'Wizard' ],
+	},
+	r = {
+		# fixme: unknown rank
+		:product => 'rhiveneh potion',
+		:steps   => [ 'light', 'add flask of clear water', 'add ayana leaf', 'add some essence of water', 'add pinch of mithril dust', 'simmer', 'add some powdered blue coral', 'add some essence of water', 'add some faintly glowing dust', 'boil', 'add some powdered uncut diamond', 'infuse', 'add essence of greater water', 'chant 925', 'seal' ],
+		:type    => 'potions',
+		:spell   => '925',
+		:rank    => [ 63, 63 ], # fixme: unknown start rank
+		:for     => [ 'Wizard' ],
+	},
 	#
 	# alchemic trinkets recipes
 	#
@@ -2233,6 +2267,14 @@ $alchemy_recipes = [
 		:steps   => [ 'light', 'add flask of clear water', 'add tiny golden seed', 'simmer', 'add pine cone', 'add small wild rose', "add ayana'al leaf", 'add uncut emerald', 'boil', 'seal' ],
 	},
 
+	r = {
+		:product => 'reflective soulstone',
+		:steps   => [ 'light', 'add vial of viscous liquid', 'add some essence of air', 'add some essence of earth', 'add some essence of fire', 'add some essence of water', 'infuse', 'add gleaming multicolored soulstone', 'chant 925', 'seal' ],
+		:type    => 'trinkets',
+		:rank    => [ 63, 63 ],
+		:for     => [ 'Wizard' ],
+	},
+
 	#
 	# buy reagents
 	#
@@ -2260,7 +2302,7 @@ $alchemy_recipes = [
 	r = {
 		:product => 'vial of viscous liquid',
 		:steps   => [ "buy from #{Char.prof.downcase} alchemy shop" ],
-		:cost    => 100,
+		:cost    => 100	,
 	},
 	r = {
 		:product => 'vial of sand-like liquid',
@@ -3030,6 +3072,13 @@ $alchemy_recipes = [
 		:steps   => [ "buy from River's Rest empath fixme" ],
 		:cost    => 7000,
 	},
+	r = {
+		:product => 'gleaming multicolored soulstone',
+		:steps   => [ "buy from a Sorcerer fixme" ],
+		:cost    => 7000,
+	},
+		
+	
 
 	#
 	# grind reagents
@@ -3736,6 +3785,10 @@ $alchemy_reagent_op_cost = {
 	"some essence of earth"               =>  255,
 	"some essence of fire"                =>  255,
 	"some essence of water"               =>  255,
+	"an essence of greater air"           => 5000,
+	"an essence of greater earth"         => 5000,
+	"an essence of greater fire"          => 5000,
+	"an essence of greater water"         => 5000,
 	"pristine nymph's hair"               =>  255,
 	"small troll tooth"                   =>  319,
 	"glimmering blue essence shard"       =>  319,
@@ -3759,6 +3812,7 @@ $alchemy_reagent_op_cost = {
 	"n'ayanad crystal"                    => 2678,
 	"some radiant crimson essence dust"   => 3443,
 	"radiant crimson mote of essence"     => 3443,
+	"gleaming multicolored soulstone"	  => 0,
 }
 
 $alchemy_recipes.delete_if { |recipe| !recipe[:for].nil? and !recipe[:for].include?(Char.prof) }
