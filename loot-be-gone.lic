@@ -82,6 +82,9 @@ silence_me unless $loot_be_gone_debug
 withdraw_amount = 8000
 save_value = { 'gemshop' => 15000, 'pawnshop' => 35000 }
 
+put_regex               = /^You (?:attempt to shield .*? from view as you |discreetly |carefully |absent-mindedly )?(?:put|place|slip|tuck|add|hang|drop|untie your|find an incomplete bundle|wipe off .*? and sheathe)|^A sigh of grateful pleasure can be heard as you feed .*? to your|^As you place|^I could not find what you were referring to\.$|^Your bundle would be too large|^The .+ is too large to be bundled\.|^As you place your|^The .*? is already a bundle|^Your .*? won't fit in .*?\.$|^You can't .+ It's closed!$|^You need a free hand to pick that up\.|^Do you want to put that in or on/
+get_regex               = /^You (?:shield the opening of .*? from view as you |discreetly |carefully |deftly )?(?:remove|draw|grab|reach|slip|tuck|retrieve|already have|unsheathe|pick up)|^Get what\?$|^Why don't you leave some for others\?$|^You need a free hand|^I could not find what you were referring to\./
+
 $loot_be_gone_ignore ||= Array.new
 need_close_lootsack    = Array.new
 
@@ -737,7 +740,7 @@ lootsack_put = proc { |obj|
 		cmd = "put #{obj} in"
 	end
 	for lootsack in lootsack_list
-		result = dothistimeout "#{cmd} ##{lootsack.id}", 5, /^You put|^You need a free hand to pick that up\.|It's closed!|^Your .*? won't fit in .*?\.$|^I could not find what you were referring to\.|^Do you want to put that in or on/
+		result = dothistimeout "#{cmd} ##{lootsack.id}", 5, put_regex
 		break unless result =~ /won't fit/
 	end
 }
@@ -804,7 +807,7 @@ need_to_open_boxes = proc {
 table = activator = trash = nil
 open_box = proc { |box|
 	unless (GameObj.right_hand.id == box.id) or (GameObj.left_hand.id == box.id)
-		dothistimeout "get ##{box.id}", 5, /^You remove|^Get what\?$/
+		dothistimeout "get ##{box.id}", 5, get_regex
 	end
 	if (GameObj.right_hand.id == box.id) or (GameObj.left_hand.id == box.id)
 		fput 'unhide' if invisible?
@@ -847,7 +850,7 @@ open_box = proc { |box|
 									close_herbsack = true
 								end
 							end
-							dothistimeout "_drag ##{obj.id} ##{herbsack.id}", 5, /^You put|^You need a free hand to pick that up\.|It's closed!|^Your .*? won't fit in .*?\.$|^I could not find what you were referring to\.|^Do you want to put that in or on/
+							dothistimeout "_drag ##{obj.id} ##{herbsack.id}", 5, put_regex
 						else
 							lootsack_put.call(obj)
 						end
@@ -1015,20 +1018,20 @@ stockpile = proc {
 							if obj.name.gsub(/large |medium |small |tiny |some /, '') == gem_name
 								result = dothistimeout "_drag ##{obj.id} ##{jar.id}", 5, /^You (?:add|put)|is full|does not appear to be a suitable container for/
 								if result =~ /^You put/
-									dothistimeout "put ##{jar.id} in ##{lootsack.id}", 5, /^You put/
+									dothistimeout "put ##{jar.id} in ##{lootsack.id}", 5, put_regex
 									gem = lootsack.contents.find { |obj| obj.id == jar.id }.after_name.gsub(/^containing |large |medium |small |tiny |some /, '')
-									dothistimeout "get ##{jar.id}", 5, /^You remove/
+									dothistimeout "get ##{jar.id}", 5, get_regex
 									jar_hash = { :gem => gem, :count => 1, :full => false }
 									CharSettings[:jars].push(jar_hash)
 								elsif result =~ /^You add/
 									jar_hash[:count] = jar_hash[:count] + 1
 								elsif result =~ /is full/
-									dothistimeout "put ##{obj.id} in ##{lootsack.id}", 5, /^You put/
+									dothistimeout "put ##{obj.id} in ##{lootsack.id}", 5, put_regex
 									jar_hash[:full] = true
 									break
 								elsif result =~ /does not appear to be a suitable container for/
 									not_suitable.push(obj.id)
-									dothistimeout "put ##{obj.id} in ##{lootsack.id}", 5, /^You put/
+									dothistimeout "put ##{obj.id} in ##{lootsack.id}", 5, put_regex
 								end
 							end
 						}
@@ -1437,15 +1440,15 @@ if CharSettings['bundle herbs']
 					move_herbs.push(herb) unless herbsack.contents.include?(herb)
 				end
 				if extra_herbs.empty?
-					move_herbs.each { |herb| dothistimeout("_drag ##{herb.id} ##{herbsack.id}", 3, /^You put/) }
+					move_herbs.each { |herb| dothistimeout("_drag ##{herb.id} ##{herbsack.id}", 3, put_regex) }
 					next
 				end
 				drop_herb = false
 				save_herb = save_herbs.shift
-				dothistimeout "get ##{save_herb.id}", 5, /^You remove/
+				dothistimeout "get ##{save_herb.id}", 5, get_regex
 				move_herbs.delete(save_herb)
 				while extra_herb = extra_herbs.shift
-					dothistimeout "get ##{extra_herb.id}", 5, /^You remove/
+					dothistimeout "get ##{extra_herb.id}", 5, get_regex
 					if drop_herb
 						check_drop_room.call
 						dothistimeout "drop ##{extra_herb.id}", 3, /^You drop/
@@ -1457,9 +1460,9 @@ if CharSettings['bundle herbs']
 									drop_herb = true
 									dothistimeout "eat ##{extra_herb.id}", 3, /^You take a bite/
 								else
-									dothistimeout "_drag ##{save_herb.id} ##{herbsack.id}", 5, /^You put/
+									dothistimeout "_drag ##{save_herb.id} ##{herbsack.id}", 5, put_regex
 									save_herb = save_herbs.shift
-									dothistimeout "get ##{save_herb.id}", 5, /^You remove/
+									dothistimeout "get ##{save_herb.id}", 5, get_regex
 									move_herbs.delete(save_herb)
 								end
 							elsif bundle_result.nil?
@@ -1468,9 +1471,9 @@ if CharSettings['bundle herbs']
 						end
 					end
 				end
-				dothistimeout "put ##{GameObj.right_hand.id} in ##{herbsack.id}", 3, /^You put/ if checkright
-				dothistimeout "put ##{GameObj.left_hand.id} in ##{herbsack.id}", 3, /^You put/ if checkleft
-				move_herbs.each { |herb| dothistimeout("_drag ##{herb.id} ##{herbsack.id}", 3, /^You put/) }
+				dothistimeout "put ##{GameObj.right_hand.id} in ##{herbsack.id}", 3, put_regex if checkright
+				dothistimeout "put ##{GameObj.left_hand.id} in ##{herbsack.id}", 3, put_regex if checkleft
+				move_herbs.each { |herb| dothistimeout("_drag ##{herb.id} ##{herbsack.id}", 3, put_regex) }
 			end
 			for potion_name,save_count in save_potion_list
 				potion_names = (equivalent_potions.find { |l| l.include?(potion_name) } || [potion_name])
@@ -1479,7 +1482,7 @@ if CharSettings['bundle herbs']
 				while (save_potions.length < save_count) and not extra_potions.empty?
 					potion = extra_potions.shift
 					save_potions.push(potion)
-					dothistimeout "_drag ##{potion.id} ##{herbsack.id}", 3, /^You put/
+					dothistimeout "_drag ##{potion.id} ##{herbsack.id}", 3, put_regex
 				end
 				if extra_potions.empty?
 					next
@@ -1487,7 +1490,7 @@ if CharSettings['bundle herbs']
 				drop_potion = false
 				save_potion = save_potions.shift
 				while extra_potion = extra_potions.shift
-					dothistimeout "get ##{extra_potion.id}", 5, /^You remove/
+					dothistimeout "get ##{extra_potion.id}", 5, get_regex
 					if drop_potion
 						check_drop_room.call
 						dothistimeout "drop ##{extra_potion.id}", 3, /^You drop/
@@ -1507,8 +1510,8 @@ if CharSettings['bundle herbs']
 						end
 					end
 				end
-				dothistimeout "put ##{GameObj.right_hand.id} in ##{herbsack.id}", 3, /^You put/ if checkright
-				dothistimeout "put ##{GameObj.left_hand.id} in ##{herbsack.id}", 3, /^You put/ if checkleft
+				dothistimeout "put ##{GameObj.right_hand.id} in ##{herbsack.id}", 3, put_regex if checkright
+				dothistimeout "put ##{GameObj.left_hand.id} in ##{herbsack.id}", 3, put_regex if checkleft
 			end
 			fill_hands
 		else
@@ -1607,13 +1610,13 @@ for place in [ 'consignment', 'furrier', 'gemshop', 'pawnshop' ]
 								for obj in lootsack.contents
 									break unless (jar_count < jar_info[:count])
 									if obj.name == jar_info[:gem]
-										dothistimeout "get ##{obj.id}", 2, /^You remove/
+										dothistimeout "get ##{obj.id}", 2, get_regex
 										unless ((jar_info[:min_value].nil? or (jar_info[:min_value] < 1)) and jar_info[:max_value].nil?)
-											result = dothistimeout "appraise ##{obj.id}", 5, /[0-9,]+ (?:silver|for it if you want to sell)|I'm not buying anything this valuable today|not quite my field|only deal in gems and jewelry|There is nothing of value to me|Trying to pull a fast one on old Hortemeyer, are you\?|Can't say I'm interested|That's basically worthless here|I have no use for that/
+											result = dothistimeout "appraise ##{obj.id}", 5, /[0-9,]+ (?:silver|for it if you want to sell|for this if you'd like)|I'm not buying anything this valuable today|not quite my field|only deal in gems and jewelry|There is nothing of value to me|Trying to pull a fast one on old Hortemeyer, are you\?|Can't say I'm interested|That's basically worthless here|I have no use for that/
 										end
-										if ((jar_info[:min_value].nil? or (jar_info[:min_value] < 1)) and jar_info[:max_value].nil?) or ((result =~ /([0-9,]+) (?:silver|for it if you want to sell)/) and (value = undo_trading_bonus.call($1.gsub(',', '').to_i)) and (jar_info[:min_value].nil? or value >= jar_info[:min_value]) and (jar_info[:max_value].nil? or value <= jar_info[:max_value]))
+										if ((jar_info[:min_value].nil? or (jar_info[:min_value] < 1)) and jar_info[:max_value].nil?) or ((result =~ /([0-9,]+) (?:silver|for it if you want to sell|for this if you'd like)/) and (value = undo_trading_bonus.call($1.gsub(',', '').to_i)) and (jar_info[:min_value].nil? or value >= jar_info[:min_value]) and (jar_info[:max_value].nil? or value <= jar_info[:max_value]))
 											unless got_jar
-												dothistimeout "get ##{jar.id}", 2, /^You remove/
+												dothistimeout "get ##{jar.id}", 2, get_regex
 												got_jar = true
 											end
 											dothistimeout "put ##{obj.id} in ##{jar.id}", 5, /^You add|^You put/
@@ -1676,14 +1679,14 @@ for place in [ 'consignment', 'furrier', 'gemshop', 'pawnshop' ]
 					next
 				end
 			end
-			dothistimeout "get ##{obj.id}", 2, /^You remove/
+			dothistimeout "get ##{obj.id}", 2, get_regex
 			fput 'unhide' if invisible?
 			if CharSettings['appraise types'] and (obj.type =~ /#{CharSettings['appraise types']}/o) and save_value[place]
-				result = dothistimeout "appraise ##{obj.id}", 5, /[0-9,]+ (?:silver|for it if you want to sell)|I'm not buying anything this valuable today|not quite my field|only deal in gems and jewelry|There is nothing of value to me|Trying to pull a fast one on old Hortemeyer, are you\?|Can't say I'm interested|That's basically worthless here|I have no use for that/
+				result = dothistimeout "appraise ##{obj.id}", 5, /[0-9,]+ (?:silver|for it if you want to sell|for this if you'd like)|I'm not buying anything this valuable today|not quite my field|only deal in gems and jewelry|There is nothing of value to me|Trying to pull a fast one on old Hortemeyer, are you\?|Can't say I'm interested|That's basically worthless here|I have no use for that/
 				if result.nil? or result =~ /not quite my field|only deal in gems and jewelry|There is nothing of value to me|Trying to pull a fast one on old Hortemeyer, are you\?/
 					lootsack_put.call(obj)
 					next
-				elsif (result =~ /([0-9,]+) (?:silver|for it if you want to sell)/ and $1.gsub(',', '').to_i >= save_value[place]) or result =~ /I'm not buying anything this valuable today|Can't say I'm interested|That's basically worthless here|I have no use for that/
+				elsif (result =~ /([0-9,]+) (?:silver|for it if you want to sell|for this if you'd like)/ and $1.gsub(',', '').to_i >= save_value[place]) or result =~ /I'm not buying anything this valuable today|Can't say I'm interested|That's basically worthless here|I have no use for that/
 					lootsack_put.call(obj)
 					$loot_be_gone_ignore.push(obj.id)
 					next
@@ -1731,7 +1734,7 @@ if (Char.name == 'Tillmen') and (Room.current.location =~ /Icemule|Solhaven|Wehn
 		if statue = table.contents.find { |o| o.name == 'small statue' }
 			empty_hands
 			if silvers < 2000
-				dothistimeout "get ##{notes.first}", 5, /^You remove|^Get what\?$/
+				dothistimeout "get ##{notes.first}", 5, get_regex
 			end
 			dothistimeout "buy ##{statue.id}", 5, /^She hands .+ to you/
 			stow_notes.call
