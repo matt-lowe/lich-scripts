@@ -131,7 +131,7 @@ if setting = script.vars.find { |var| var =~ /^\-\-retribution[_\-]spell=(?:[0-9
    end
    script.vars.delete(setting)
 end
-if setting = script.vars.find { |var| var =~ /^\-\-reserve[_\-]mana=(?:[0-9]+)$/ }
+if setting = script.vars.find { |var| var =~ /^\-\-reserve[_\-]mana=([0-9]+)$/ }
    reserve_mana = $1.to_i
    script.vars.delete(setting)
 end
