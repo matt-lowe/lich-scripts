@@ -5,21 +5,24 @@
 	 author: Tillmen (tillmen@lichproject.org)
 	   game: Gemstone
 	   tags: alchemy, guild
-	version: 0.10
+	version: 0.11
 
 	changelog:
+    0.11 (2019-05-11):
+      add zorveneh/gorveneh/raveneh/rhiveneh potion and reflective soulstone recipes (ServerFailure)
+      add essence of greater air/earth/water/fire cost (ServerFailure)
 		0.10 (2017-09-24):
 			fix shimmering silver potion (507)
 		0.9 (2015-04-26):
 			rename some powdered Kezmonian honey beryl => some powdered honey beryl
 			rename minor holy oil => some minor holy oil
 			rename some faint mote of soul => faint mote of soul
-		0.8 (2015-02-22):
-			add recipe for sisfu potion
 
 =end
 =begin
 
+		0.8 (2015-02-22):
+			add recipe for sisfu potion
 		0.7 (2015-01-26):
 			change start rank of grot'tkel potion from 15 to 13
 		0.6 (2015-01-22):
@@ -3812,7 +3815,7 @@ $alchemy_reagent_op_cost = {
 	"n'ayanad crystal"                    => 2678,
 	"some radiant crimson essence dust"   => 3443,
 	"radiant crimson mote of essence"     => 3443,
-	"gleaming multicolored soulstone"	  => 0,
+	"gleaming multicolored soulstone"	    => 0,
 }
 
 $alchemy_recipes.delete_if { |recipe| !recipe[:for].nil? and !recipe[:for].include?(Char.prof) }
