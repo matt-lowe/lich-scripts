@@ -16,8 +16,8 @@
    requried: Lich >= 4.6.0
 
    changelog:
-      0.11 (2020-01-08):
-         changed fill function to go to closest herbalist instead of a single hardcoded one
+      0.11 (2020-10-07):
+         changed fill function to go to closest herbalist instead of a single hardcoded one, update for commas
       0.10 (2017-09-30):
          add feature to fill your herbsack with herbs (;useherbs stock herbs)
       0.9 (2017-03-04):
@@ -249,7 +249,7 @@ check_silvers = proc {
    action = proc { |server_string|
       if server_string =~ /^\s*Name\:|^\s*Gender\:|^\s*Normal \(Bonus\)|^\s*Strength \(STR\)\:|^\s*Constitution \(CON\)\:|^\s*Dexterity \(DEX\)\:|^\s*Agility \(AGI\)\:|^\s*Discipline \(DIS\)\:|^\s*Aura \(AUR\)\:|^\s*Logic \(LOG\)\:|^\s*Intuition \(INT\)\:|^\s*Wisdom \(WIS\)\:|^\s*Influence \(INF\)\:/
          nil
-      elsif server_string =~ /^\s*Mana\:\s+\-?[0-9]+\s+Silver\:\s+[0-9]+/
+      elsif server_string =~ /^\s*Mana\:\s+\-?[0-9]+\s+Silver\:\s+[0-9,]+/
          DownstreamHook.remove("#{script.name}_check_silvers")
          nil
       else
@@ -262,8 +262,8 @@ check_silvers = proc {
    put 'info'
    silence_me if undo_silence
    while line = get
-      if line =~ /^\s*Mana\:\s+\-?[0-9]+\s+Silver\:\s+([0-9]+)/
-         silvers = $1.to_i
+      if line =~ /^\s*Mana\:\s+\-?[0-9]+\s+Silver\:\s+([0-9,]+)/
+         silvers = $1.gsub(',','').to_i
          break
       end
    end
