@@ -12,22 +12,24 @@
      author: Tillmen (tillmen@lichproject.org)
        game: Gemstone
        tags: healing
-    version: 0.11
+    version: 0.12
    requried: Lich >= 4.6.0
 
    changelog:
+      0.12 (2020-10-10):
+         response message for buying herbs now has commas
       0.11 (2020-10-07):
          changed fill function to go to closest herbalist instead of a single hardcoded one, update for commas
       0.10 (2017-09-30):
          add feature to fill your herbsack with herbs (;useherbs stock herbs)
-      0.9 (2017-03-04):
-         remove 506 from the script, since it doesn't affect eating herbs anymore
-      0.8 (2017-01-14):
-         withdraw silvers first when using the "stock potions" command
 
 =end
 =begin
 
+      0.9 (2017-03-04):
+         remove 506 from the script, since it doesn't affect eating herbs anymore
+      0.8 (2017-01-14):
+         withdraw silvers first when using the "stock potions" command
       0.7 (2015-04-26):
          fix for working with hidden containers, like the basket in Ta'Vaalor
       0.6 (2015-03-28):
@@ -444,9 +446,9 @@ buy_herb = proc { |herb_type|
       exit
    end
    dothistimeout "order #{order_number}", 3, /BUY/
-   buy_result = dothistimeout 'buy', 3, /Sold for [0-9]+ silver|^But you do not have enough silver!/
-   if buy_result =~ /Sold for ([0-9]+) silver/
-      silvers -= $1.to_i
+   buy_result = dothistimeout 'buy', 3, /Sold for [0-9,]+ silver|^But you do not have enough silver!/
+   if buy_result =~ /Sold for ([0-9,]+) silver/
+      silvers -= $1.gsub(',','').to_i
    elsif buy_result =~ /^But you do not have enough silver!/
       withdraw.call
       go_to_herbalist.call
@@ -639,9 +641,9 @@ elsif script.vars[1].downcase == 'fill'
             exit
          end
          dothistimeout "order #{order_number}", 3, /BUY/
-         buy_result = dothistimeout 'buy', 3, /Sold for [0-9]+ silver|^But you do not have enough silver!/
-         if buy_result =~ /Sold for ([0-9]+) silver/
-            silvers -= $1.to_i
+         buy_result = dothistimeout 'buy', 3, /Sold for [0-9,]+ silver|^But you do not have enough silver!/
+         if buy_result =~ /Sold for ([0-9,]+) silver/
+            silvers -= $1.gsub(',','').to_i
          elsif buy_result =~ /^But you do not have enough silver!/
             withdraw.call
             go_to_herbalist.call
@@ -1360,9 +1362,9 @@ while herb_type = next_herb_type.call
          buy_missing = false
       end
       dothistimeout "order #{order_number}", 3, /BUY/
-      buy_result = dothistimeout 'buy', 3, /Sold for [0-9]+ silver|^But you do not have enough silver!/
-      if buy_result =~ /Sold for ([0-9]+) silver/
-         silvers -= $1.to_i
+      buy_result = dothistimeout 'buy', 3, /Sold for [0-9,]+ silver|^But you do not have enough silver!/
+      if buy_result =~ /Sold for ([0-9,]+) silver/
+         silvers -= $1.gsub(',','').to_i
       elsif buy_result =~ /^But you do not have enough silver!/
          withdraw.call
          go_to_herbalist.call
