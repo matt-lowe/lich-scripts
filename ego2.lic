@@ -25,9 +25,11 @@
 	 author: Tillmen (tillmen@lichproject.org)
 	   game: Gemstone
 	   tags: bounty
-	version: 0.5
+	version: 0.6
 
 	changelog:
+    0.6 (2020-10-10):
+      fix commas in silver check
 		0.5 (2015-04-07):
 			ignore disabled people's disabled bandits
 			don't use "a tiny shard of jet black crystal" as an indicator of who owns the bandits
@@ -232,8 +234,8 @@ check_silvers = proc {
 	action = proc { |server_string|
 		if server_string =~ /^\s*Name\:|^\s*Gender\:|^\s*Normal \(Bonus\)|^\s*Strength \(STR\)\:|^\s*Constitution \(CON\)\:|^\s*Dexterity \(DEX\)\:|^\s*Agility \(AGI\)\:|^\s*Discipline \(DIS\)\:|^\s*Aura \(AUR\)\:|^\s*Logic \(LOG\)\:|^\s*Intuition \(INT\)\:|^\s*Wisdom \(WIS\)\:|^\s*Influence \(INF\)\:/
 			nil
-		elsif server_string =~ /^\s*Mana\:\s+\-?[0-9]+\s+Silver\:\s+([0-9]+)/
-			silvers = $1.to_i
+		elsif server_string =~ /^\s*Mana\:\s+\-?[0-9]+\s+Silver\:\s+([0-9,]+)/
+			silvers = $1.gsub(',','').to_i
 			DownstreamHook.remove("#{script.name}_check_silvers")
 			nil
 		else
