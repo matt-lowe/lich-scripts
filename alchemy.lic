@@ -7,20 +7,22 @@
      author: Tillmen (tillmen@lichproject.org)
        game: Gemstone
        tags: alchemy, guild
-    version: 0.15
+    version: 0.16
    required: alchemy-recipes.lic >= 0.3
 
    changelog:
+      0.16 (2020-10-20):
+         fix commas in silver check
       0.15 (2018-09-15):
          fix collecting water
       0.14 (2017-11-11):
          fix squelching of gld verb for inactive members
-      0.13 (2017-01-14):
-         make grind task work with "set sortedview on"
 
 =end
 =begin
 
+      0.13 (2017-01-14):
+         make grind task work with "set sortedview on"
       0.12 (2015-07-08):
          added support for more scripted containers
       0.11 (2015-07-08):
@@ -203,8 +205,8 @@ check_silvers = proc {
    action = proc { |server_string|
       if server_string =~ /^\s*Name\:|^\s*Gender\:|^\s*Normal \(Bonus\)|^\s*Strength \(STR\)\:|^\s*Constitution \(CON\)\:|^\s*Dexterity \(DEX\)\:|^\s*Agility \(AGI\)\:|^\s*Discipline \(DIS\)\:|^\s*Aura \(AUR\)\:|^\s*Logic \(LOG\)\:|^\s*Intuition \(INT\)\:|^\s*Wisdom \(WIS\)\:|^\s*Influence \(INF\)\:/
          nil
-      elsif server_string =~ /^\s*Mana\:\s+\-?[0-9]+\s+Silver\:\s+([0-9]+)/
-         silvers = $1.to_i
+      elsif server_string =~ /^\s*Mana\:\s+\-?[0-9]+\s+Silver\:\s+([0-9,]+)/
+         silvers = $1.gsub(',','').to_i
          DownstreamHook.remove("#{script.name}_check_silvers")
          nil
       else
