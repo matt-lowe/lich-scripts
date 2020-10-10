@@ -121,8 +121,8 @@ check_silvers = proc {
 	action = proc { |server_string|
 		if server_string =~ /^\s*Name\:|^\s*Gender\:|^\s*Normal \(Bonus\)|^\s*Strength \(STR\)\:|^\s*Constitution \(CON\)\:|^\s*Dexterity \(DEX\)\:|^\s*Agility \(AGI\)\:|^\s*Discipline \(DIS\)\:|^\s*Aura \(AUR\)\:|^\s*Logic \(LOG\)\:|^\s*Intuition \(INT\)\:|^\s*Wisdom \(WIS\)\:|^\s*Influence \(INF\)\:/
 			nil
-		elsif server_string =~ /^\s*Mana\:\s+\-?[0-9]+\s+Silver\:\s+([0-9]+)/
-			silvers = $1.to_i
+		elsif server_string =~ /^\s*Mana\:\s+\-?[0-9]+\s+Silver\:\s+([0-9,]+)/
+			silvers = $1.gsub(',','').to_i
 			DownstreamHook.remove("#{script.name}_check_silvers")
 			nil
 		else
@@ -193,7 +193,7 @@ remove_sting = proc {
 		empty_hands
 		until (deaths_sting == 'None') or dead?
 			find_priestess_2.call
-			result = dothistimeout "give ##{GameObj.npcs.find { |npc| npc.noun == 'priestess' }.id} #{potion_cost} silvers", 5, /^What is it you're trying to give\?$|^You start to hand the priestess [0-9]+ silvers, but she only takes|^You count your coins and realize that you don't have that much money!$|^You hand the priestess/
+			result = dothistimeout "give ##{GameObj.npcs.find { |npc| npc.noun == 'priestess' }.id} #{potion_cost} silvers", 5, /^What is it you're trying to give\?$|^You start to hand the priestess [0-9,]+ silvers, but she only takes|^You count your coins and realize that you don't have that much money!$|^You hand the priestess/
 			if result == "You count your coins and realize that you don't have that much money!"
 				break if out_of_silvers
 				this_room = Room.current
@@ -205,7 +205,7 @@ remove_sting = proc {
 				if check_silvers.call < (potion_cost * 5)
 					out_of_silvers = true
 				end
-			elsif result =~ /^You hand the priestess [0-9]+ silvers\.|^You start to hand the priestess [0-9]+ silvers, but she only takes/
+			elsif result =~ /^You hand the priestess [0-9,]+ silvers\.|^You start to hand the priestess [0-9,]+ silvers, but she only takes/
 				dothistimeout 'drink my flask', 5, /^As you sip|^You take a sip/
 				check_sting.call
 			end
