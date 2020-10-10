@@ -12,10 +12,12 @@
      author: Tillmen (tillmen@lichproject.org)
        game: Gemstone
        tags: healing
-    version: 0.10
+    version: 0.11
    requried: Lich >= 4.6.0
 
    changelog:
+      0.11 (2020-10-07):
+         changed fill function to go to closest herbalist instead of a single hardcoded one, update for commas
       0.10 (2017-09-30):
          add feature to fill your herbsack with herbs (;useherbs stock herbs)
       0.9 (2017-03-04):
@@ -165,6 +167,7 @@ $known_herbs = [
    { :name=>"barrel of Bearded Ladies' ale",    :type=>"minor limb scar",    :short_name => "Bearded Ladies' ale" },
    # fixme
    { :name=>"some sovyn clove",                 :type=>"severed limb",       :short_name => "sovyn clove",   :store_doses=>1 },
+   { :name=>"small sovyn clove",                :type=>"severed limb",       :short_name => "sovyn clove",   :store_doses=>1 },
    { :name=>"sovyn clove",                      :type=>"severed limb",       },
    { :name=>"tincture of sovyn",                :type=>"severed limb",       },
    { :name=>"candied ptarmigan feather",        :type=>"severed limb",       :short_name => 'ptarmigan feather', :store_doses=>1 },
@@ -246,7 +249,7 @@ check_silvers = proc {
    action = proc { |server_string|
       if server_string =~ /^\s*Name\:|^\s*Gender\:|^\s*Normal \(Bonus\)|^\s*Strength \(STR\)\:|^\s*Constitution \(CON\)\:|^\s*Dexterity \(DEX\)\:|^\s*Agility \(AGI\)\:|^\s*Discipline \(DIS\)\:|^\s*Aura \(AUR\)\:|^\s*Logic \(LOG\)\:|^\s*Intuition \(INT\)\:|^\s*Wisdom \(WIS\)\:|^\s*Influence \(INF\)\:/
          nil
-      elsif server_string =~ /^\s*Mana\:\s+\-?[0-9]+\s+Silver\:\s+[0-9]+/
+      elsif server_string =~ /^\s*Mana\:\s+\-?[0-9]+\s+Silver\:\s+[0-9,]+/
          DownstreamHook.remove("#{script.name}_check_silvers")
          nil
       else
@@ -259,8 +262,8 @@ check_silvers = proc {
    put 'info'
    silence_me if undo_silence
    while line = get
-      if line =~ /^\s*Mana\:\s+\-?[0-9]+\s+Silver\:\s+([0-9]+)/
-         silvers = $1.to_i
+      if line =~ /^\s*Mana\:\s+\-?[0-9]+\s+Silver\:\s+([0-9,]+)/
+         silvers = $1.gsub(',','').to_i
          break
       end
    end
@@ -625,7 +628,7 @@ elsif script.vars[1].downcase == 'fill'
    unless silvers > 4000
       withdraw.call
    end
-   Script.run('go2', '325')
+   go_to_herbalist.call
    herb_shop_menu = read_menu.call
    for herb_type in [ 'blood', 'major head wound', 'minor head wound', 'major head scar', 'minor head scar', 'major organ wound', 'minor organ wound', 'major organ scar', 'minor organ scar', 'missing eye', 'major limb wound', 'minor limb wound', 'major limb scar', 'minor limb scar', 'severed limb', 'major nerve wound', 'minor nerve wound', 'major nerve scar', 'minor nerve scar' ]
       unless herb_container.contents.any? { |obj| $known_herbs.any? { |herb| (herb[:name] == obj.name) and herb[:type] == herb_type } }
@@ -656,6 +659,7 @@ elsif script.vars[1].downcase == 'fill'
       end
    end
    fput "close ##{herb_container.id}" if close_herbsack
+   deposit.call
    Script.run('go2', start_room.id.to_s)
    exit
 elsif script.vars[1].downcase == 'escort'
@@ -680,7 +684,7 @@ elsif script.vars[1].downcase == 'escort'
       if open_result =~ /^You open/
          close_herbsack = true
       else
-         dothistimeout "look in ##{herb_container.id}", 10, /In the .*? you see/
+         dothistimeout "look in ##{herb_container.id}", 10, /In the .*? you see|In the .*?\:/
          if herb_container.contents.nil?
             echo "error: failed to find herb container contents (#{herb_container.name}, #{herb_container.id})"
             exit
@@ -915,7 +919,7 @@ elsif script.vars[1].downcase == 'stock'
       if open_result =~ /^You open/
          close_herbsack = true
       else
-         dothistimeout "look in ##{herb_container.id}", 10, /In the .*? you see/
+         dothistimeout "look in ##{herb_container.id}", 10, /In the .*? you see|In the .*?\:/
          if herb_container.contents.nil?
             echo "error: timeout while trying to look in herb container (#{herb_container.name}, #{herb_container.id})"
             exit
@@ -1293,7 +1297,7 @@ else
       if open_result =~ /^You open/
          close_herbsack = true
       else
-         dothistimeout "look in ##{herb_container.id}", 10, /In the .*? you see/
+         dothistimeout "look in ##{herb_container.id}", 10, /In the .*? you see|In the .*?\:/
          if herb_container.contents.nil?
             echo 'fixme 38923'
             exit
