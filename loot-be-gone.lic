@@ -20,20 +20,22 @@
     author: Tillmen (tillmen@lichproject.org)
       game: Gemstone
       tags: loot
-   version: 0.14
+   version: 0.15
   required: Lich >= 4.6.14
 
   changelog:
+    0.15 (2020-10-10):
+      fix for commas in silver check
     0.14 (2019-05-11):
       improve regexes (austin-j)
     0.13 (2018-09-04):
-       don't sell bounty gems in Sylvarrend
-    0.12 (2018-08-30):
-       don't show trusted script warning on Ruby >= 2.3
+      don't sell bounty gems in Sylvarrend
 
 =end
 =begin
 
+    0.12 (2018-08-30):
+      don't show trusted script warning on Ruby >= 2.3
     0.11 (2017-09-23):
       herb bundling function now works when the herbsack is also a lootsack
       combine equivalent healing potions from different towns
@@ -762,7 +764,7 @@ check_silvers = proc {
   hook_proc = proc { |server_string|
     if server_string =~ /^\s*Name\:|^\s*Gender\:|^\s*Normal \(Bonus\)|^\s*Strength \(STR\)\:|^\s*Constitution \(CON\)\:|^\s*Dexterity \(DEX\)\:|^\s*Agility \(AGI\)\:|^\s*Discipline \(DIS\)\:|^\s*Aura \(AUR\)\:|^\s*Logic \(LOG\)\:|^\s*Intuition \(INT\)\:|^\s*Wisdom \(WIS\)\:|^\s*Influence \(INF\)\:/
       nil
-    elsif server_string =~ /^\s*Mana\:\s+\-?[0-9]+\s+Silver\:\s+([0-9]+)/
+    elsif server_string =~ /^\s*Mana\:\s+\-?[0-9]+\s+Silver\:\s+([0-9,]+)/
       DownstreamHook.remove('go2_check_silvers')
       nil
     else
@@ -776,8 +778,8 @@ check_silvers = proc {
   silence_me if undo_silence
    start = Time.now
   while (line = get)
-    if line =~ /^\s*Mana\:\s+\-?[0-9]+\s+Silver\:\s+([0-9]+)/
-      silvers = $1.to_i
+    if line =~ /^\s*Mana\:\s+\-?[0-9]+\s+Silver\:\s+([0-9,]+)/
+      silvers = $1.gsub(',','').to_i
       break
       elsif (Time.now - start) > 15
          silvers = 0
@@ -1695,7 +1697,7 @@ for place in [ 'consignment', 'furrier', 'gemshop', 'pawnshop' ]
         end
       end
       fput 'unhide' if invisible?
-      result = dothistimeout "sell ##{obj.id}", 5, /(?:pays|hands) you [0-9]+ silver|not quite my field|only deal in gems and jewelry|I have no use for that|Where do you find this junk/
+      result = dothistimeout "sell ##{obj.id}", 5, /(?:pays|hands) you [0-9,]+ silver|not quite my field|only deal in gems and jewelry|I have no use for that|Where do you find this junk/
       stow_notes.call
       if (GameObj.right_hand.id == obj.id) or (GameObj.left_hand.id == obj.id)
         lootsack_put.call(obj)
