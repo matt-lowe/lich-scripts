@@ -10,10 +10,12 @@
 
 	 author: Tillmen (tillmen@lichproject.org)
 	   game: Gemstone
-	version: 0.6
+	version: 0.7
 	   tags: cosmetic
 
 	changelog:
+    0.7 (2020-10-10):
+      fix for new exp verb output
 		0.6 (2014-12-12):
 			fix time since last use
 		0.5 (2014-12-10):
@@ -35,8 +37,8 @@ if script.vars[1]
 			CharSettings['realtime'] = nil
 		end
 		echo "Experience tracking has been reset."
-	elsif (script.vars[1].downcase == 'goal') and (script.vars[2] =~ /^[0-9]+$/)
-		CharSettings['goal'] = script.vars[2].to_i
+	elsif (script.vars[1].downcase == 'goal') and (script.vars[2] =~ /^[0-9,]+$/)
+		CharSettings['goal'] = script.vars[2].gsub(',','').to_i
 		echo "Experience goal set to #{CharSettings['goal']}."
 	else
 		output = "\n"
@@ -154,13 +156,13 @@ silence_me
 put "experience"
 
 while (line = get)
-	if line =~ /^\s+Experience: ([0-9]+)/
-		now['exp'] = $1.to_i
-	elsif line =~ /^Exp\. (?:until next|to next TP): (\-?[0-9]+)/
-		xp_until_next = $1.to_i
-	elsif line =~ /^\s+Mental TPs: [0-9]+\s+Fame: ([0-9]+)/
-		now['fame'] = $1.to_i
-	elsif line =~ /Mana/
+	if line =~ /^\s+Experience: ([0-9,]+)/
+		now['exp'] = $1.gsub(',','').to_i
+	elsif line =~ /^\s*Exp (?:until next|to next TP): (\-?[0-9,]+)/
+		xp_until_next = $1.gsub(',','').to_i
+	elsif line =~ /^\s+Level: [0-9,]+\s+Fame: ([0-9,]+)/
+		now['fame'] = $1.gsub(',','').to_i
+	elsif line =~ /PTPs\/MTPs/
 		break
 	end
 end
