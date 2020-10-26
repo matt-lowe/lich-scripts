@@ -18,6 +18,8 @@
    changelog:
       0.13 (2020-10-26):
          added KF herbs
+      0.12 (2020-10-10):
+         response message for buying herbs now has commas
       0.11 (2020-10-07):
          changed fill function to go to closest herbalist instead of a single hardcoded one, update for commas
       0.10 (2017-09-30):
