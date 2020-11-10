@@ -762,7 +762,7 @@ do_administrator = proc {
                      did_something = true
                   end
                elsif (info[:task] == 'promotion')
-                  if type != 'alchemy' or info[:rank].to_i != 5 or (gld.call['potions'][:rank].to_i >= 2 and gld.call['trinkets'][:rank].to_i >= 2)
+                  if type != 'alchemy' or (gld.call['potions'][:rank].to_i >= 2 and gld.call['trinkets'][:rank].to_i >= 2)
                      if type != 'alchemy' or (gld.call['potions'][:rank].to_i >= 3 and gld.call['trinkets'][:rank].to_i >= 3)
                         if room_id = where_is.call("#{Char.prof.downcase} alchemy guildmaster").first
                            start_script 'go2', [ room_id.to_s ]
