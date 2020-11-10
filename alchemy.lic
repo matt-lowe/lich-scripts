@@ -763,7 +763,7 @@ do_administrator = proc {
                   end
                elsif (info[:task] == 'promotion')
                   if type != 'alchemy' or info[:rank].to_i != 5 or (gld.call['potions'][:rank].to_i >= 2 and gld.call['trinkets'][:rank].to_i >= 2)
-                     if type != 'alchemy' or info[:rank].to_i != 10 or (gld.call['potions'][:rank].to_i >= 3 and gld.call['trinkets'][:rank].to_i >= 3)
+                     if type != 'alchemy' or (gld.call['potions'][:rank].to_i >= 3 and gld.call['trinkets'][:rank].to_i >= 3)
                         if room_id = where_is.call("#{Char.prof.downcase} alchemy guildmaster").first
                            start_script 'go2', [ room_id.to_s ]
                            wait_while { running?('go2') }
@@ -788,7 +788,12 @@ do_administrator = proc {
                   did_something = true
                elsif info[:task] == "gather alchemy ingredients for the guild's supply"
                   invalid_gld.call
-                  dothistimeout "ask #{GameObj.npcs.last.noun} about trade #{type}", 10, /^#{GameObj.npcs.last.noun} .*?, "/
+                  gldTrade = dothistimeout "ask #{GameObj.npcs.last.noun} about trade #{type}", 10, /^#{GameObj.npcs.last.noun} .*?, "/
+                  if gldTrade =~ /You will need to wait [0-9]+ minutes before trading in another task.|Come back in about [0-9]+ minutes if you want another task/
+                     pauseTime = $1.to_i + 0.5
+					      echo "Waiting #{pauseTime} minutes to request next task."
+                     pause "#{pauseTime}m"
+				      end                  
                   did_something = true
                end
             end
