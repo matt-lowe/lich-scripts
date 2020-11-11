@@ -757,7 +757,13 @@ do_administrator = proc {
                next if (type =~ /potions|trinkets/) and (info[:rank] == gld.call['alchemy'][:rank])
                if info[:task] == 'no task'
                   result = dothistimeout "ask #{GameObj.npcs.last.noun} about training #{type}", 10, /^#{GameObj.npcs.last.noun} .*?, "/
-                  invalid_gld.call
+  		  invalid_gld.call
+		  if result =~ /Come back in about ([0-9]+) minutes if you want another task/
+			pauseTime = $1.to_i + 0.5
+			pauseTimeS = pauseTime*60
+			respond "Waiting #{pauseTime} minutes to request next task."
+			sleep pauseTimeS
+		  end		  
                   unless result =~ /your general alchemy skills are not quite up to snuff/
                      did_something = true
                   end
@@ -788,7 +794,13 @@ do_administrator = proc {
                   did_something = true
                elsif info[:task] == "gather alchemy ingredients for the guild's supply"
                   invalid_gld.call
-                  dothistimeout "ask #{GameObj.npcs.last.noun} about trade #{type}", 10, /^#{GameObj.npcs.last.noun} .*?, "/
+                  result = dothistimeout "ask #{GameObj.npcs.last.noun} about trade #{type}", 10, /^#{GameObj.npcs.last.noun} .*?, "/
+		  if result =~ /You will need to wait ([0-9]+) minutes before trading in another task/
+			pauseTime = $1.to_i + 0.5
+			pauseTimeS = pauseTime*60
+			respond "Waiting #{pauseTime} minutes to request next task."
+			sleep pauseTimeS
+		  end		  
                   did_something = true
                end
             end
