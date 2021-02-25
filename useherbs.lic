@@ -12,10 +12,12 @@
      author: Tillmen (tillmen@lichproject.org)
        game: Gemstone
        tags: healing
-    version: 0.13
+    version: 0.14
    requried: Lich >= 4.6.0
 
    changelog:
+      0.14 (2021-02-25):
+         fix bug for list injuries when given specific type
       0.13 (2020-10-26):
          added KF herbs
       0.12 (2020-10-10):
@@ -544,7 +546,7 @@ elsif script.vars[1] =~ /^list$/i
       known_herbs.delete_if { |herb| herb[:type] =~ /disease/ } unless script.vars[0] =~ /disease/
    end
    list = Hash.new
-   for herb in $known_herbs
+   for herb in known_herbs
       list[herb[:type]] ||= Array.new
       list[herb[:type]].push(herb[:name])
    end
