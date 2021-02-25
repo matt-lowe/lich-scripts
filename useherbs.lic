@@ -12,10 +12,14 @@
      author: Tillmen (tillmen@lichproject.org)
        game: Gemstone
        tags: healing
-    version: 0.12
+    version: 0.14
    requried: Lich >= 4.6.0
 
    changelog:
+      0.14 (2021-02-25):
+         fix bug for list injuries when given specific type
+      0.13 (2020-10-26):
+         added KF herbs
       0.12 (2020-10-10):
          response message for buying herbs now has commas
       0.11 (2020-10-07):
@@ -52,6 +56,7 @@
 $known_herbs = [
    { :name=>"some acantha leaf",                :type=>"blood",              :short_name => "acantha leaf",   :store_doses=>10 },
    { :name=>"some spicy acantha leaf",          :type=>"blood",              :short_name => "spicy acantha leaf",   :store_doses=>10 },
+   { :name=>"acantha leaf",                     :type=>"blood",              :store_doses=>10 },
    { :name=>"tincture of acantha",              :type=>"blood",              },
    { :name=>"tincture of yabathilium",          :type=>"blood",              },
    { :name=>"yabathilium fruit",                :type=>"blood",              },
@@ -63,6 +68,7 @@ $known_herbs = [
    { :name=>"flagon of Bloody Krolvin ale",     :type=>"blood",              :short_name => "Bloody Krolvin ale" },
    { :name=>"barrel of Bloody Krolvin ale",     :type=>"blood",              :short_name => "Bloody Krolvin ale" },
    { :name=>"some aloeas stem",                 :type=>"major head wound",   :short_name => "aloeas stem",   :store_doses=>2 },
+   { :name=>"aloeas stem",                      :type=>"major head wound",   :short_name => "aloeas stem",   :store_doses=>2 },
    { :name=>"some withered aloeas stem",        :type=>"major head wound",   :short_name => "withered aloeas stem",   :store_doses=>2 },
    { :name=>"tincture of aloeas",               :type=>"major head wound",   },
    { :name=>"tiny ram's bladder tart",          :type=>"major head wound",   :short_name => "ram's bladder tart", :store_doses=>2 },
@@ -71,6 +77,7 @@ $known_herbs = [
    { :name=>"flagon of Dark Swampwater ale",    :type=>"major head wound",   :short_name => "Dark Swampwater ale" },
    { :name=>"barrel of Dark Swampwater ale",    :type=>"major head wound",   :short_name => "Dark Swampwater ale" },
    { :name=>"rose-marrow potion",               :type=>"minor head wound",   :store_doses=>4 },
+   { :name=>"rose-marrow elixir",               :type=>"minor head wound",   },
    { :name=>"crystalline rose-marrow elixir",   :type=>"minor head wound",   },
    { :name=>"tincture of rose-marrow",          :type=>"minor head wound",   },
    { :name=>"elk horn potion",                  :type=>"minor head wound",   :store_doses=>4 },
@@ -79,6 +86,7 @@ $known_herbs = [
    { :name=>"flagon of Semak's Smooth ale",     :type=>"minor head wound",   :short_name => "Semak's Smooth ale" },
    { :name=>"barrel of Semak's Smooth ale",     :type=>"minor head wound",   :short_name => "Semak's Smooth ale" },
    { :name=>"brostheras potion",                :type=>"major head scar",    :store_doses=>2 },
+   { :name=>"brostheras elixir",                :type=>"major head scar",    },
    { :name=>"crystalline brostheras elixir",    :type=>"major head scar",    },
    { :name=>"tincture of brostheras",           :type=>"major head scar",    },
    { :name=>"tiny cup of polar bear fat soup",  :type=>"major head scar",    :store_doses=>2, :short_name => 'polar bear fat soup' },
@@ -87,6 +95,7 @@ $known_herbs = [
    { :name=>"flagon of Reaper's Red ale",       :type=>"major head scar",    :short_name => "Reaper's Red ale" },
    { :name=>"barrel of Reaper's Red ale",       :type=>"major head scar",    :short_name => "Reaper's Red ale" },
    { :name=>"some haphip root",                 :type=>"minor head scar",    :short_name => "haphip root",   :store_doses=>4 },
+   { :name=>"haphip root",                      :type=>"minor head scar",    :short_name => "haphip root",   :store_doses=>4 },
    { :name=>"some dirty haphip root",           :type=>"minor head scar",    :short_name => "dirty haphip root",   :store_doses=>4 },
    { :name=>"tincture of haphip",               :type=>"minor head scar",    },
    { :name=>"slice of sparrowhawk pie",         :type=>"minor head scar",    :store_doses=>5, :short_name => 'sparrowhawk pie' },
@@ -95,6 +104,7 @@ $known_herbs = [
    { :name=>"flagon of Agrak's Amber ale",      :type=>"minor head scar",    :short_name => "Agrak's Amber ale" },
    { :name=>"barrel of Agrak's Amber ale",      :type=>"minor head scar",    :short_name => "Agrak's Amber ale" },
    { :name=>"some pothinir grass",              :type=>"major organ wound",  :short_name => "pothinir grass",   :store_doses=>2 },
+   { :name=>"pothinir grass",                   :type=>"major organ wound",  :short_name => "pothinir grass",   :store_doses=>2 },
    { :name=>"some bright green pothinir grass", :type=>"major organ wound",  :short_name => "pothinir grass",   :store_doses=>2 },
    { :name=>"tincture of pothinir",             :type=>"major organ wound",  },
    { :name=>"tiny musk ox tart",                :type=>"major organ wound",    :short_name => 'musk ox tart', :store_doses=>2 },
@@ -103,6 +113,7 @@ $known_herbs = [
    { :name=>"flagon of Aged Schooner ale",      :type=>"major organ wound",  :short_name => "Aged Schooner ale" },
    { :name=>"barrel of Aged Schooner ale",      :type=>"major organ wound",  :short_name => "Aged Schooner ale" },
    { :name=>"some basal moss",                  :type=>"minor organ wound",  :short_name => "basal moss",   :store_doses=>4 },
+   { :name=>"basal moss",                       :type=>"minor organ wound",  :short_name => "basal moss",   :store_doses=>4 },
    { :name=>"tincture of moss",                 :type=>"minor organ wound",  },
    { :name=>"sticky ball of basal moss",        :type=>"minor organ wound",  :store_doses=>4 },
    { :name=>"tincture of basal",                :type=>"minor organ wound",  },
@@ -112,6 +123,7 @@ $known_herbs = [
    { :name=>"flagon of Mama Dwarf's ale",       :type=>"minor organ wound",  :short_name => "Mama Dwarf's ale" },
    { :name=>"barrel of Mama Dwarf's ale",       :type=>"minor organ wound",  :short_name => "Mama Dwarf's ale" },
    { :name=>"wingstem potion",                  :type=>"major organ scar",   :store_doses=>2 },
+   { :name=>"wingstem elixir",                  :type=>"major organ scar",   },
    { :name=>"crystalline wingstem elixir",      :type=>"major organ scar",   },
    { :name=>"tincture of wingstem",             :type=>"major organ scar",   },
    { :name=>"earthworm potion",                 :type=>"major organ scar",   :store_doses=>2 },
@@ -121,6 +133,7 @@ $known_herbs = [
    { :name=>"barrel of Wort's Winter ale",      :type=>"major organ scar",   :short_name => "Wort's Winter ale" },
    { :name=>"talneo potion",                    :type=>"minor organ scar",   :store_doses=>4 },
    { :name=>"crystalline talneo elixir",        :type=>"minor organ scar",   },
+   { :name=>"talneo elixir",                    :type=>"minor organ scar",   },
    { :name=>"tincture of talneo",               :type=>"minor organ scar",   },
    { :name=>"rock lizard potion",               :type=>"minor organ scar",   :store_doses=>4 },
    { :name=>"wyrmwood root tea",                :type=>"minor organ scar",   },
@@ -129,6 +142,7 @@ $known_herbs = [
    { :name=>"barrel of Gert's Homemade ale",    :type=>"minor organ scar",   :short_name => "Gert's Homemade ale" },
    { :name=>"bur-clover potion",                :type=>"missing eye",        :store_doses=>1 },
    { :name=>"crystalline bur-clover elixir",    :type=>"missing eye",        },
+   { :name=>"bur-clover elixir",                :type=>"missing eye",        },
    { :name=>"tincture of bur-clover",           :type=>"missing eye",        },
    { :name=>"starfish potion",                  :type=>"missing eye",        :store_doses=>1 },
    { :name=>"daggit root potion",               :type=>"missing eye",        },
@@ -136,6 +150,7 @@ $known_herbs = [
    { :name=>"flagon of Volcano Vision ale",     :type=>"missing eye",        :short_name => "Volcano Vision ale" },
    { :name=>"barrel of Volcano Vision ale",     :type=>"missing eye",        :short_name => "Volcano Vision ale" },
    { :name=>"some ephlox moss",                 :type=>"major limb wound",   :short_name => "ephlox moss",   :store_doses=>4 },
+   { :name=>"ephlox moss",                      :type=>"major limb wound",   :short_name => "ephlox moss",   :store_doses=>4 },
    { :name=>"gooey ball of ephlox moss",        :type=>"major limb wound",   },
    { :name=>"tincture of ephlox",               :type=>"major limb wound",   },
    { :name=>"some frog's bone porridge",        :type=>"major limb wound",   :store_doses=>4, :short_name => "frog's bone porridge" },
@@ -144,6 +159,7 @@ $known_herbs = [
    { :name=>"flagon of Golden Goose ale",       :type=>"major limb wound",   :short_name => "Golden Goose ale" },
    { :name=>"barrel of Golden Goose ale",       :type=>"major limb wound",   :short_name => "Golden Goose ale" },
    { :name=>"some ambrominas leaf",             :type=>"minor limb wound",   :short_name => "ambrominas leaf",   :store_doses=>4 },
+   { :name=>"ambrominas leaf",                  :type=>"minor limb wound",   :short_name => "ambrominas leaf",   :store_doses=>4 },
    { :name=>"some sugary ambrominas leaf",      :type=>"minor limb wound",   :short_name => "sugary ambrominas leaf" },
    { :name=>"tincture of ambrominas",           :type=>"minor limb wound",   },
    { :name=>"Dabbings Family special tart",     :type=>"minor limb wound",   :store_doses=>4, :short_name => 'Family special tart' },
@@ -152,6 +168,7 @@ $known_herbs = [
    { :name=>"flagon of Lost Dogwater ale",      :type=>"minor limb wound",   :short_name => "Lost Dogwater ale" },
    { :name=>"barrel of Lost Dogwater ale",      :type=>"minor limb wound",   :short_name => "Lost Dogwater ale" },
    { :name=>"some calamia fruit",               :type=>"major limb scar",    :short_name => "calamia fruit",   :store_doses=>2 },
+   { :name=>"calamia fruit",                    :type=>"major limb scar",    :short_name => "calamia fruit",   :store_doses=>2 },
    { :name=>"some ripe calamia fruit",          :type=>"major limb scar",    :short_name => "ripe calamia fruit" },
    { :name=>"tincture of calamia",              :type=>"major limb scar",    },
    { :name=>"slice of pickled walrus blubber",  :type=>"major limb scar",    :store_doses=>2, :short_name => 'pickled walrus blubber' },
@@ -160,6 +177,7 @@ $known_herbs = [
    { :name=>"flagon of Mad Mutt Frothy ale",    :type=>"major limb scar",    :short_name => "Mad Mutt Frothy ale" },
    { :name=>"barrel of Mad Mutt Frothy ale",    :type=>"major limb scar",    :short_name => "Mad Mutt Frothy ale" },
    { :name=>"some cactacae spine",              :type=>"minor limb scar",    :short_name => "cactacae spine",   :store_doses=>4 },
+   { :name=>"cactacae spine",                   :type=>"minor limb scar",    :short_name => "cactacae spine",   :store_doses=>4 },
    { :name=>"some prickly cactacae spine",      :type=>"minor limb scar",    :short_name => "prickly cactacae spine" },
    { :name=>"tincture of cactacae",             :type=>"minor limb scar",    },
    { :name=>"gelatinous elk fat tart",          :type=>"minor limb scar",    :short_name => 'elk fat tart', :store_doses=>10 },
@@ -179,6 +197,7 @@ $known_herbs = [
    { :name=>"barrel of Captn' Pegleg's ale",    :type=>"severed limb",       :short_name => "Captn' Pegleg's ale" },
    { :name=>"bolmara potion",                   :type=>"major nerve wound",  :store_doses=>4 },
    { :name=>"crystalline bolmara elixir",       :type=>"major nerve wound",  },
+   { :name=>"bolmara elixir",                   :type=>"major nerve wound",  },
    { :name=>"tincture of bolmara",              :type=>"major nerve wound",  },
    { :name=>"snowflake elixir",                 :type=>"major nerve wound",  :store_doses=>4 },
    { :name=>"red lichen potion",                :type=>"major nerve wound",  },
@@ -186,6 +205,7 @@ $known_herbs = [
    { :name=>"flagon of Kenar's Dropjaw ale",    :type=>"major nerve wound",  :short_name => "Kenar's Dropjaw ale" },
    { :name=>"barrel of Kenar's Dropjaw ale",    :type=>"major nerve wound",  :short_name => "Kenar's Dropjaw ale" },
    { :name=>"some wolifrew lichen",             :type=>"minor nerve wound",  :short_name => "wolifrew lichen",   :store_doses=>4 },
+   { :name=>"wolifrew lichen",                  :type=>"minor nerve wound",  :short_name => "wolifrew lichen",   :store_doses=>4 },
    { :name=>"some dry wolifrew lichen",         :type=>"minor nerve wound",  :short_name => "dry wolifrew lichen", },
    { :name=>"tincture of wolifrew",             :type=>"minor nerve wound",  },
    { :name=>"Leaftoe's lichen tart",            :type=>"minor nerve wound",  :store_doses=>4, :short_name => 'lichen tart' },
@@ -194,6 +214,7 @@ $known_herbs = [
    { :name=>"flagon of Orc's Head ale",         :type=>"minor nerve wound",  :short_name => "Orc's Head ale" },
    { :name=>"barrel of Orc's Head ale",         :type=>"minor nerve wound",  :short_name => "Orc's Head ale" },
    { :name=>"some woth flower",                 :type=>"major nerve scar",   :short_name => "woth flower",   :store_doses=>2 },
+   { :name=>"woth flower",                      :type=>"major nerve scar",   :short_name => "woth flower",   :store_doses=>2 },
    { :name=>"some fragrant woth flower",        :type=>"major nerve scar",   :short_name => "fragrant woth flower" },
    { :name=>"tincture of woth",                 :type=>"major nerve scar",   },
    { :name=>"tiny flower-shaped tart",          :type=>"major nerve scar",   :store_doses=>2, :short_name => 'flower-shaped tart' },
@@ -202,6 +223,7 @@ $known_herbs = [
    { :name=>"flagon of Dacra's Dream ale",      :type=>"major nerve scar",   :short_name => "Dacra's Dream ale" },
    { :name=>"barrel of Dacra's Dream ale",      :type=>"major nerve scar",   :short_name => "Dacra's Dream ale" },
    { :name=>"some torban leaf",                 :type=>"minor nerve scar",   :short_name => "torban leaf",   :store_doses=>3 },
+   { :name=>"torban leaf",                      :type=>"minor nerve scar",   :short_name => "torban leaf",   :store_doses=>3 },
    { :name=>"some fresh torban leaf",           :type=>"minor nerve scar",   :short_name => "fresh torban leaf" },
    { :name=>"tincture of torban",               :type=>"minor nerve scar",   },
    { :name=>"slice of Ma Leaftoe's Special",    :type=>"minor nerve scar",   :store_doses=>5, :short_name => "Ma Leaftoe's Special" },
@@ -524,7 +546,7 @@ elsif script.vars[1] =~ /^list$/i
       known_herbs.delete_if { |herb| herb[:type] =~ /disease/ } unless script.vars[0] =~ /disease/
    end
    list = Hash.new
-   for herb in $known_herbs
+   for herb in known_herbs
       list[herb[:type]] ||= Array.new
       list[herb[:type]].push(herb[:name])
    end
